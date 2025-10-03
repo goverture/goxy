@@ -8,20 +8,9 @@ import (
 	"time"
 
 	"github.com/goverture/goxy/handlers"
-	"github.com/joho/godotenv"
 )
 
 func main() {
-	// Load variables from a local .env file if present (ignored if missing).
-	// This lets you put TARGET, OPENAI_API_KEY, etc. in a .env for local dev.
-	if err := godotenv.Load(); err != nil {
-		// Only log if the file exists but couldn't be parsed; a missing file is fine.
-		// We check for existence manually to avoid noisy logs when there's simply no .env.
-		if _, statErr := os.Stat(".env"); statErr == nil {
-			log.Printf("warning: could not load .env: %v", err)
-		}
-	}
-
 	target := os.Getenv("TARGET") // e.g. https://someapi.com
 	if target == "" {
 		log.Fatal("set TARGET, e.g. TARGET=https://someapi.com")

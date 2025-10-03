@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"os"
 	"time"
+
+	"github.com/goverture/goxy/config"
 )
 
 // stripForwardingHeaders removes X-Forwarded-* and similar before the upstream call.
@@ -22,7 +24,12 @@ func (t stripForwardingHeaders) RoundTrip(r *http.Request) (*http.Response, erro
 	return t.base.RoundTrip(r)
 }
 
-func NewProxyHandler(upstream *url.URL) http.Handler {
+func NewProxyHandler() http.Handler {
+	upstreamURL := config.Cfg.OpenAIBaseURL
+	upstream, err := url.Parse(upstreamURL)
+	if err != nil {
+		panic("invalid upstream URL: " + err.Error())
+	}
 	proxy := httputil.NewSingleHostReverseProxy(upstream)
 	upHost := upstream.Host
 

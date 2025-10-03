@@ -5,8 +5,9 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"testing"
+
+	"github.com/goverture/goxy/config"
 )
 
 func TestProxy_ForwardsMethodPathQueryBodyAndHeaders(t *testing.T) {
@@ -26,8 +27,12 @@ func TestProxy_ForwardsMethodPathQueryBodyAndHeaders(t *testing.T) {
 	}))
 	defer upstream.Close()
 
-	upURL, _ := url.Parse(upstream.URL)
-	h := NewProxyHandler(upURL)
+	// Set up the global config for the test - point to our test upstream
+	config.Cfg = &config.Config{
+		OpenAIBaseURL: upstream.URL,
+	}
+
+	h := NewProxyHandler()
 
 	// Build a request that would hit our proxy
 	body := bytes.NewBufferString(`{"hello":"world"}`)

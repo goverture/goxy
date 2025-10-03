@@ -3,24 +3,20 @@ package main
 import (
 	"log"
 	"net/http"
-	"net/url"
-	"os"
 	"time"
 
+	"github.com/goverture/goxy/config"
 	"github.com/goverture/goxy/handlers"
 )
 
 func main() {
-	target := os.Getenv("TARGET") // e.g. https://someapi.com
-	if target == "" {
-		log.Fatal("set TARGET, e.g. TARGET=https://someapi.com")
-	}
-	up, err := url.Parse(target)
-	if err != nil {
-		log.Fatalf("invalid TARGET: %v", err)
-	}
+	// Parse CLI flags
+	config.Cfg = config.ParseConfig()
 
-	h := cors(handlers.NewProxyHandler(up))
+	// Print the config
+	log.Printf("Config: %+v", config.Cfg)
+
+	h := cors(handlers.NewProxyHandler())
 
 	srv := &http.Server{
 		Addr:         ":8080",
@@ -30,7 +26,7 @@ func main() {
 		IdleTimeout:  120 * time.Second,
 	}
 
-	log.Printf("Proxying to %s on %s", up, srv.Addr)
+	log.Printf("Proxying to %s on %s", config.Cfg, srv.Addr)
 	log.Fatal(srv.ListenAndServe())
 }
 

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/goverture/goxy/config"
+	"github.com/goverture/goxy/pricing"
 )
 
 // sseLoggingBody wraps an SSE (text/event-stream) body, logging each JSON event line as it passes through
@@ -51,8 +52,12 @@ func (s *sseLoggingBody) processChunk(chunk []byte) {
 
 func (s *sseLoggingBody) handleLine(line string) {
 	line = strings.TrimSpace(line)
-	if line == "" { return }
-	if !strings.HasPrefix(line, "data:") { return }
+	if line == "" {
+		return
+	}
+	if !strings.HasPrefix(line, "data:") {
+		return
+	}
 	payload := strings.TrimSpace(line[len("data:"):])
 	if payload == "[DONE]" { // termination event
 		fmt.Println("[proxy] SSE event: [DONE]")
@@ -175,10 +180,24 @@ func NewProxyHandler() http.Handler {
 			resp.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 
 			// Try to parse JSON
-			var parsed interface{}
+			var parsed map[string]interface{}
 			if err := json.Unmarshal(bodyBytes, &parsed); err == nil {
 				pretty, _ := json.MarshalIndent(parsed, "", "  ")
 				fmt.Println("[proxy] Upstream JSON response:\n" + string(pretty))
+				// Attempt pricing if usage + model present
+				modelName, _ := parsed["model"].(string)
+				if usageRaw, ok := parsed["usage"].(map[string]interface{}); ok {
+					u := pricing.Usage{}
+					if v, ok := usageRaw["prompt_tokens"].(float64); ok {
+						u.PromptTokens = int(v)
+					}
+					if v, ok := usageRaw["completion_tokens"].(float64); ok {
+						u.CompletionTokens = int(v)
+					}
+					if pr, err := pricing.ComputePrice(modelName, u); err == nil {
+						fmt.Println(pr.String())
+					}
+				}
 			} else {
 				fmt.Println("[proxy] Failed to parse JSON response:", err)
 			}

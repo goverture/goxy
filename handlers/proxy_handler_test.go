@@ -131,7 +131,9 @@ func TestProxy_LogsSSEStream(t *testing.T) {
 		}
 		for _, e := range events {
 			_, _ = w.Write([]byte(e + "\n"))
-			if flusher != nil { flusher.Flush() }
+			if flusher != nil {
+				flusher.Flush()
+			}
 			time.Sleep(5 * time.Millisecond)
 		}
 	}))
@@ -143,7 +145,9 @@ func TestProxy_LogsSSEStream(t *testing.T) {
 	// Capture stdout for logging assertions
 	oldStdout := os.Stdout
 	rPipe, wPipe, err := os.Pipe()
-	if err != nil { t.Fatalf("pipe err: %v", err) }
+	if err != nil {
+		t.Fatalf("pipe err: %v", err)
+	}
 	os.Stdout = wPipe
 
 	req := httptest.NewRequest(http.MethodGet, "http://proxy.local/v1/stream", nil)
@@ -157,7 +161,9 @@ func TestProxy_LogsSSEStream(t *testing.T) {
 	outStr := string(logged)
 
 	// Response should be the concatenated SSE data as written (we won't assert exact because newline timing) but status 200
-	if rr.Code != http.StatusOK { t.Fatalf("expected 200, got %d", rr.Code) }
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
 	// Ensure logging of each JSON event
 	if !strings.Contains(outStr, `"step": 1`) {
 		t.Fatalf("missing first event JSON log: %s", outStr)

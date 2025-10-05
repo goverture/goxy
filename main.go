@@ -21,11 +21,11 @@ func main() {
 
 	addr := ":" + itoa(config.Cfg.Port)
 	srv := &http.Server{
-		 Addr:         addr,
-		 Handler:      h,
-		 ReadTimeout:  15 * time.Second,
-		 WriteTimeout: 0,
-		 IdleTimeout:  120 * time.Second,
+		Addr:         addr,
+		Handler:      h,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 0,
+		IdleTimeout:  120 * time.Second,
 	}
 
 	log.Printf("Proxying to %+v on %s", config.Cfg, srv.Addr)

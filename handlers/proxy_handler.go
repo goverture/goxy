@@ -1,11 +1,15 @@
 package handlers
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/goverture/goxy/config"
@@ -90,13 +94,38 @@ func NewProxyHandler() http.Handler {
 	proxy.FlushInterval = 50 * time.Millisecond
 
 	// Add CORS on the way out (useful for browsers) + disable buffering on some proxies
+	// Additionally, intercept JSON responses to log their contents before forwarding.
 	proxy.ModifyResponse = func(resp *http.Response) error {
+		// CORS headers
 		if origin := resp.Request.Header.Get("Origin"); origin != "" {
 			h := resp.Header
 			h.Set("Access-Control-Allow-Origin", origin)
 			h.Set("Vary", "Origin")
 			h.Set("Access-Control-Expose-Headers", "Content-Type, OpenAI-Processing-Ms")
 			h.Set("X-Accel-Buffering", "no")
+		}
+
+		ct := resp.Header.Get("Content-Type")
+		// Only attempt to parse if it's JSON and not an event stream (SSE)
+		if strings.Contains(ct, "application/json") && !strings.Contains(ct, "text/event-stream") && resp.Body != nil {
+			bodyBytes, err := io.ReadAll(resp.Body)
+			if err != nil {
+				// Restore an empty body so downstream doesn't panic
+				resp.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+				return nil // best-effort logging; don't fail the response
+			}
+
+			// Reset body for downstream before any heavy processing to minimize latency impact
+			resp.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+
+			// Try to parse JSON
+			var parsed interface{}
+			if err := json.Unmarshal(bodyBytes, &parsed); err == nil {
+				pretty, _ := json.MarshalIndent(parsed, "", "  ")
+				fmt.Println("[proxy] Upstream JSON response:\n" + string(pretty))
+			} else {
+				fmt.Println("[proxy] Failed to parse JSON response:", err)
+			}
 		}
 		return nil
 	}

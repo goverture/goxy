@@ -5,6 +5,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/goverture/goxy/config"
@@ -65,5 +67,53 @@ func TestProxy_ForwardsMethodPathQueryBodyAndHeaders(t *testing.T) {
 	}
 	if capturedBody != `{"hello":"world"}` {
 		t.Fatalf("body not forwarded, got %q", capturedBody)
+	}
+}
+
+func TestProxy_LogsParsedJSONResponse(t *testing.T) {
+	// Upstream server returning JSON we can predict
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"from-upstream"}`)) // valid JSON body
+	}))
+	defer upstream.Close()
+
+	// Configure proxy
+	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL}
+	h := NewProxyHandler()
+
+	// Capture stdout
+	oldStdout := os.Stdout
+	rPipe, wPipe, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe err: %v", err)
+	}
+	os.Stdout = wPipe
+
+	// Perform request
+	req := httptest.NewRequest(http.MethodGet, "http://proxy.local/v1/test", nil)
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+
+	// Restore stdout
+	wPipe.Close()
+	os.Stdout = oldStdout
+	logged, _ := io.ReadAll(rPipe)
+
+	// Basic response assertion to ensure normal proxy function
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	if body := rr.Body.String(); body != `{"status":"from-upstream"}` {
+		t.Fatalf("unexpected proxied body: %q", body)
+	}
+
+	outStr := string(logged)
+	if !strings.Contains(outStr, "[proxy] Upstream JSON response:") {
+		t.Fatalf("expected log marker not found. Got logs: %s", outStr)
+	}
+	if !strings.Contains(outStr, `"status": "from-upstream"`) {
+		t.Fatalf("expected pretty JSON in logs, got: %s", outStr)
 	}
 }

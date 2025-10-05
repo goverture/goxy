@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -18,16 +19,22 @@ func main() {
 
 	h := cors(handlers.NewProxyHandler())
 
+	addr := ":" + itoa(config.Cfg.Port)
 	srv := &http.Server{
-		Addr:         ":8080",
-		Handler:      h,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 0,
-		IdleTimeout:  120 * time.Second,
+		 Addr:         addr,
+		 Handler:      h,
+		 ReadTimeout:  15 * time.Second,
+		 WriteTimeout: 0,
+		 IdleTimeout:  120 * time.Second,
 	}
 
-	log.Printf("Proxying to %s on %s", config.Cfg, srv.Addr)
+	log.Printf("Proxying to %+v on %s", config.Cfg, srv.Addr)
 	log.Fatal(srv.ListenAndServe())
+}
+
+// itoa is a minimal int to string conversion for port formatting
+func itoa(i int) string {
+	return fmt.Sprintf("%d", i)
 }
 
 // Simple CORS (browser-friendly)

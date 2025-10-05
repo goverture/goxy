@@ -15,6 +15,62 @@ import (
 	"github.com/goverture/goxy/config"
 )
 
+// sseLoggingBody wraps an SSE (text/event-stream) body, logging each JSON event line as it passes through
+type sseLoggingBody struct {
+	rc  io.ReadCloser
+	buf bytes.Buffer // accumulate partial lines between Read calls
+}
+
+func (s *sseLoggingBody) Read(p []byte) (int, error) {
+	n, err := s.rc.Read(p)
+	if n > 0 {
+		// Feed the newly read bytes into line processor
+		s.processChunk(p[:n])
+	}
+	return n, err
+}
+
+func (s *sseLoggingBody) Close() error { return s.rc.Close() }
+
+func (s *sseLoggingBody) processChunk(chunk []byte) {
+	// Append to buffer
+	s.buf.Write(chunk)
+	for {
+		data := s.buf.Bytes()
+		idx := bytes.IndexByte(data, '\n')
+		if idx == -1 { // no complete line yet
+			return
+		}
+		// Extract line including up to idx
+		line := string(data[:idx])
+		// Remove this line + newline from buffer
+		s.buf.Next(idx + 1)
+		s.handleLine(strings.TrimRight(line, "\r"))
+	}
+}
+
+func (s *sseLoggingBody) handleLine(line string) {
+	line = strings.TrimSpace(line)
+	if line == "" { return }
+	if !strings.HasPrefix(line, "data:") { return }
+	payload := strings.TrimSpace(line[len("data:"):])
+	if payload == "[DONE]" { // termination event
+		fmt.Println("[proxy] SSE event: [DONE]")
+		return
+	}
+	// Attempt JSON parse if looks like JSON
+	if strings.HasPrefix(payload, "{") || strings.HasPrefix(payload, "[") {
+		var v interface{}
+		if err := json.Unmarshal([]byte(payload), &v); err == nil {
+			pretty, _ := json.MarshalIndent(v, "", "  ")
+			fmt.Println("[proxy] SSE event JSON:\n" + string(pretty))
+			return
+		}
+	}
+	// Fallback raw payload
+	fmt.Println("[proxy] SSE raw event:", payload)
+}
+
 // stripForwardingHeaders removes X-Forwarded-* and similar before the upstream call.
 type stripForwardingHeaders struct{ base http.RoundTripper }
 
@@ -106,7 +162,7 @@ func NewProxyHandler() http.Handler {
 		}
 
 		ct := resp.Header.Get("Content-Type")
-		// Only attempt to parse if it's JSON and not an event stream (SSE)
+		// JSON (non-SSE) full-body logging
 		if strings.Contains(ct, "application/json") && !strings.Contains(ct, "text/event-stream") && resp.Body != nil {
 			bodyBytes, err := io.ReadAll(resp.Body)
 			if err != nil {
@@ -126,6 +182,9 @@ func NewProxyHandler() http.Handler {
 			} else {
 				fmt.Println("[proxy] Failed to parse JSON response:", err)
 			}
+		} else if strings.Contains(ct, "text/event-stream") && resp.Body != nil {
+			// Wrap SSE body to log events as they stream; do not buffer entire stream
+			resp.Body = &sseLoggingBody{rc: resp.Body}
 		}
 		return nil
 	}

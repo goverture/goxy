@@ -14,9 +14,13 @@ const (
 
 // Usage contains token usage fields we care about.
 type Usage struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-	TotalTokens      int `json:"total_tokens"`
+	PromptTokens int `json:"prompt_tokens"`
+	// PromptCachedTokens are prompt tokens served from cache and billed at a 90% discount
+	// (i.e. they cost 10% of a normal prompt token). If this exceeds PromptTokens it will
+	// be clamped to PromptTokens.
+	PromptCachedTokens int `json:"cached_prompt_tokens"`
+	CompletionTokens   int `json:"completion_tokens"`
+	TotalTokens        int `json:"total_tokens"`
 }
 
 // PriceResult holds the computed pricing info.
@@ -72,9 +76,23 @@ func ComputePrice(modelRaw string, u Usage) (PriceResult, error) {
 	if !ok {
 		return PriceResult{Model: m, PromptTokens: u.PromptTokens, CompletionTokens: u.CompletionTokens, Note: "unknown model pricing"}, nil
 	}
-	ptCost := (float64(u.PromptTokens) / 1000.0) * tiers.Prompt
+	// Apply cached prompt token discount (cached tokens cost 10% of normal prompt tokens)
+	billedPromptTokens := float64(u.PromptTokens)
+	if u.PromptCachedTokens > 0 {
+		cached := u.PromptCachedTokens
+		if cached > u.PromptTokens {
+			cached = u.PromptTokens
+		}
+		// Effective billed prompt tokens: non-cached + 10% of cached
+		billedPromptTokens = float64(u.PromptTokens-cached) + 0.1*float64(cached)
+	}
+	ptCost := (billedPromptTokens / 1000.0) * tiers.Prompt
 	ctCost := (float64(u.CompletionTokens) / 1000.0) * tiers.Completion
 	total := ptCost + ctCost
+	note := "prices hard-coded; verify against https://openai.com/api/pricing/"
+	if u.PromptCachedTokens > 0 {
+		note += " (includes 90% discount for cached prompt tokens)"
+	}
 	return PriceResult{
 		Model:             m,
 		PromptTokens:      u.PromptTokens,
@@ -82,7 +100,7 @@ func ComputePrice(modelRaw string, u Usage) (PriceResult, error) {
 		PromptCostUSD:     ptCost,
 		CompletionCostUSD: ctCost,
 		TotalCostUSD:      total,
-		Note:              "prices hard-coded; verify against https://openai.com/api/pricing/",
+		Note:              note,
 	}, nil
 }
 

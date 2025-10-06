@@ -12,7 +12,7 @@ go run main.go -openai-base-url=https://api.anthropic.com/v1
 curl -v http://localhost:8080/v1/chat/completions \
   -H "Authorization: Bearer $OPENAI_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"model":"gpt-5-mini","messages":[{"role":"user","content":"What model are you ?"}]}'
+  -d '{"model":"gpt-5-mini","messages":[{"role":"user","content":"Waht is the capital of France ?"}]}'
 
 # Streaming
 

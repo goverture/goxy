@@ -194,6 +194,12 @@ func NewProxyHandler() http.Handler {
 					if v, ok := usageRaw["completion_tokens"].(float64); ok {
 						u.CompletionTokens = int(v)
 					}
+					// nested prompt_tokens_details.cached_tokens
+					if detailsRaw, ok := usageRaw["prompt_tokens_details"].(map[string]interface{}); ok {
+						if v, ok := detailsRaw["cached_tokens"].(float64); ok {
+							u.PromptCachedTokens = int(v)
+						}
+					}
 					if pr, err := pricing.ComputePrice(modelName, u); err == nil {
 						fmt.Println(pr.String())
 					}

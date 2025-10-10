@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/goverture/goxy/config"
+	"github.com/goverture/goxy/limit"
 	"github.com/goverture/goxy/pricing"
 )
 
@@ -90,6 +91,8 @@ func (t stripForwardingHeaders) RoundTrip(r *http.Request) (*http.Response, erro
 }
 
 func NewProxyHandler() http.Handler {
+	// Spend limit manager
+	mgr := limit.NewManager(config.Cfg.SpendLimitPerHour)
 	upstreamURL := config.Cfg.OpenAIBaseURL
 	upstream, err := url.Parse(upstreamURL)
 	if err != nil {
@@ -121,7 +124,6 @@ func NewProxyHandler() http.Handler {
 
 		// Helpful for SSE
 		r.Header.Set("Cache-Control", "no-cache")
-
 		// Forward proto info if not present
 		if r.Header.Get("X-Forwarded-Proto") == "" {
 			if r.TLS != nil {
@@ -202,6 +204,10 @@ func NewProxyHandler() http.Handler {
 					}
 					if pr, err := pricing.ComputePrice(modelName, u); err == nil {
 						fmt.Println(pr.String())
+						// accumulate cost toward spend limit (use API key passed via header earlier)
+						if apiKey := resp.Request.Header.Get("X-Proxy-API-Key"); apiKey != "" {
+							mgr.AddCost(apiKey, pr.TotalCostUSD)
+						}
 					}
 				}
 			} else {
@@ -229,7 +235,19 @@ func NewProxyHandler() http.Handler {
 
 		fmt.Println("Received API Key:", auth) // Debug log to verify the extracted key
 
-		// Forward the request to the upstream server
+		// Spend limit check BEFORE proxy
+		if allowed, windowEnd, spent, lim := mgr.Allow(auth); !allowed {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusTooManyRequests)
+			fmt.Fprintf(w, `{"error":"spend limit exceeded","limit_per_hour":%.2f,"spent_this_window":%.4f,"window_ends_at":"%s"}`, lim, spent, windowEnd.UTC().Format(time.RFC3339))
+			return
+		}
+
+		// Pass stripped key to response modifier for accumulation
+		if auth != "" {
+			r.Header.Set("X-Proxy-API-Key", auth)
+		}
+
 		proxy.ServeHTTP(w, r)
 	})
 }

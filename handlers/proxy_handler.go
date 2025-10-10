@@ -9,6 +9,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -237,9 +238,21 @@ func NewProxyHandler() http.Handler {
 
 		// Spend limit check BEFORE proxy
 		if allowed, windowEnd, spent, lim := mgr.Allow(auth); !allowed {
+			// Compute seconds until reset (window end)
+			secUntil := int(time.Until(windowEnd).Seconds())
+			if secUntil < 0 { secUntil = 0 }
+			// Standard header for 429 retry guidance
+			w.Header().Set("Retry-After", strconv.Itoa(secUntil))
+			// Draft/RFC 9333 style RateLimit headers (informational)
+			// RateLimit-Limit: total allowed per window (here monetary, USD)
+			// RateLimit-Remaining: remaining allowance (0 when blocked)
+			// RateLimit-Reset: seconds until window resets
+			w.Header().Set("RateLimit-Limit", fmt.Sprintf("%.2f", lim))
+			w.Header().Set("RateLimit-Remaining", "0")
+			w.Header().Set("RateLimit-Reset", strconv.Itoa(secUntil))
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusTooManyRequests)
-			fmt.Fprintf(w, `{"error":"spend limit exceeded","limit_per_hour":%.2f,"spent_this_window":%.4f,"window_ends_at":"%s"}`, lim, spent, windowEnd.UTC().Format(time.RFC3339))
+			fmt.Fprintf(w, `{"error":"spend limit exceeded","limit_per_hour":%.2f,"spent_this_window":%.4f,"window_ends_at":"%s","retry_after_seconds":%d}`, lim, spent, windowEnd.UTC().Format(time.RFC3339), secUntil)
 			return
 		}
 

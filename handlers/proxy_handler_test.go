@@ -175,3 +175,65 @@ func TestProxy_LogsSSEStream(t *testing.T) {
 		t.Fatalf("missing done marker log: %s", outStr)
 	}
 }
+
+func TestProxy_SpendLimitExceeded(t *testing.T) {
+	// Upstream server that returns pricing-eligible JSON (model + usage)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		// Cost per request (prompt tokens 200 @ gpt-4o prompt $0.005/1K) => 0.2 * 0.005 = $0.001
+		w.Write([]byte(`{"model":"gpt-4o","usage":{"prompt_tokens":200,"completion_tokens":0}}`))
+	}))
+	defer upstream.Close()
+
+	// Spend limit just above first request cost so second pushes over limit; third should be blocked
+	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL, SpendLimitPerHour: 0.0015}
+	h := NewProxyHandler()
+
+	doReq := func() *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "http://proxy.local/v1/chat/completions", nil)
+		req.Header.Set("Authorization", "Bearer test-key-1")
+		rr := httptest.NewRecorder()
+		h.ServeHTTP(rr, req)
+		return rr
+	}
+
+	// First request (spend 0.001) allowed
+	if rr := doReq(); rr.Code != http.StatusOK {
+		t.Fatalf("first request unexpected status %d body=%s", rr.Code, rr.Body.String())
+	}
+	// Second request (spend now 0.002) still allowed (limit check before adding cost)
+	if rr := doReq(); rr.Code != http.StatusOK {
+		t.Fatalf("second request unexpected status %d body=%s", rr.Code, rr.Body.String())
+	}
+	// Third request should be blocked (spent already > limit)
+	if rr := doReq(); rr.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected 429 on third request, got %d body=%s", rr.Code, rr.Body.String())
+	} else if !strings.Contains(rr.Body.String(), "spend limit exceeded") {
+		t.Fatalf("expected spend limit message in body: %s", rr.Body.String())
+	}
+}
+
+func TestProxy_ZeroLimitBlocksImmediately(t *testing.T) {
+	// Upstream that would normally return low-cost JSON
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"model":"gpt-4o","usage":{"prompt_tokens":10,"completion_tokens":0}}`))
+	}))
+	defer upstream.Close()
+
+	// Zero limit => every non-anonymous key blocked right away
+	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL, SpendLimitPerHour: 0}
+	h := NewProxyHandler()
+
+	req := httptest.NewRequest(http.MethodGet, "http://proxy.local/v1/test", nil)
+	req.Header.Set("Authorization", "Bearer zero-key")
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected 429 for zero limit, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), "spend limit exceeded") {
+		t.Fatalf("expected spend limit message in body: %s", rr.Body.String())
+	}
+}

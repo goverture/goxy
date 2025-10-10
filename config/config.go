@@ -1,7 +1,7 @@
 package config
 
 import (
-	"flag"
+	"github.com/spf13/pflag"
 )
 
 var (
@@ -19,9 +19,10 @@ type Config struct {
 // ParseConfig parses command-line flags into a Config struct.
 func ParseConfig() *Config {
 	cfg := &Config{}
-	flag.StringVar(&cfg.OpenAIBaseURL, "openai-base-url", "https://api.openai.com", "OpenAI API base URL")
-	flag.IntVar(&cfg.Port, "port", 8080, "Port to listen on")
-	flag.Float64Var(&cfg.SpendLimitPerHour, "spend-limit-per-hour", 2.0, "Per-API-key spend limit in USD per hour (<=0 to disable)")
-	flag.Parse()
+	// Short forms: -u, -p, -l ; Long forms: --openai-base-url, --port, --spend-limit-per-hour
+	pflag.StringVarP(&cfg.OpenAIBaseURL, "openai-base-url", "u", "https://api.openai.com", "OpenAI API base URL")
+	pflag.IntVarP(&cfg.Port, "port", "p", 8080, "Port to listen on")
+	pflag.Float64VarP(&cfg.SpendLimitPerHour, "spend-limit-per-hour", "l", 2.0, "Per-API-key spend limit USD per hour ( <0 disable, 0 block all )")
+	pflag.Parse()
 	return cfg
 }

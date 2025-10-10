@@ -8,6 +8,11 @@ import (
 // manager maintains per-key rolling (hour-bucket) spend tracking.
 // A simple fixed 1h window that resets when an hour has elapsed since first spend
 // in the window. Good enough for coarse limiting; not a precise sliding window.
+// Semantics:
+//
+//	limit < 0  => limiter disabled (all allowed, nothing tracked)
+//	limit == 0 => zero allowance (every non-anonymous key immediately blocked)
+//	limit > 0  => spend allowed until accumulated >= limit
 type Manager struct {
 	limit  float64  // USD per hour (<=0 disables)
 	perKey sync.Map // map[string]*keyWindow
@@ -27,8 +32,14 @@ func NewManager(limit float64) *Manager { return &Manager{limit: limit} }
 // It returns allowed, windowEnd, spentSoFar, limit.
 func (m *Manager) Allow(key string) (bool, time.Time, float64, float64) {
 	lim := m.limit
-	if lim <= 0 || key == "" { // disabled or anonymous key
+	if key == "" { // anonymous bypasses but not tracked
 		return true, time.Time{}, 0, lim
+	}
+	if lim < 0 { // disabled limiter
+		return true, time.Time{}, 0, lim
+	}
+	if lim == 0 { // immediate block for any spend
+		return false, time.Now().Add(time.Hour), 0, lim
 	}
 	kw := m.getKW(key)
 	kw.mu.Lock()
@@ -44,9 +55,15 @@ func (m *Manager) Allow(key string) (bool, time.Time, float64, float64) {
 
 // AddCost adds the provided USD spend to a key's current window.
 func (m *Manager) AddCost(key string, delta float64) {
-	if delta <= 0 || key == "" || m.limit <= 0 {
+	if delta <= 0 || key == "" {
 		return
 	}
+	if m.limit < 0 {
+		return
+	} // disabled
+	if m.limit == 0 {
+		return
+	} // zero allowance blocked earlier
 	kw := m.getKW(key)
 	kw.mu.Lock()
 	now := time.Now()

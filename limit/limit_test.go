@@ -69,12 +69,26 @@ func TestWindowReset(t *testing.T) {
 }
 
 func TestDisabledLimit(t *testing.T) {
-	m := NewManager(0) // disabled
+	m := NewManager(-1) // disabled
 	key := "k4"
 	m.AddCost(key, 10) // should be ignored
 	allowed, _, spent, lim := m.Allow(key)
-	if !allowed || spent != 0 || lim != 0 {
+	if !allowed || spent != 0 || lim != -1 {
 		t.Fatalf("disabled limit should always allow; spent=%f lim=%f", spent, lim)
+	}
+}
+
+func TestZeroLimitBlocksAll(t *testing.T) {
+	m := NewManager(0)
+	key := "zero"
+	allowed, _, spent, lim := m.Allow(key)
+	if allowed || spent != 0 || lim != 0 {
+		t.Fatalf("zero limit should block immediately; allowed=%v spent=%f lim=%f", allowed, spent, lim)
+	}
+	m.AddCost(key, 1.0) // no-op
+	allowed2, _, spent2, _ := m.Allow(key)
+	if allowed2 || spent2 != 0 {
+		t.Fatalf("zero limit should still block; allowed2=%v spent2=%f", allowed2, spent2)
 	}
 }
 
@@ -103,5 +117,30 @@ func TestConcurrentAddCost(t *testing.T) {
 	// Spent should be ~1.0
 	if math.Abs(spent-1.0) > 1e-6 {
 		t.Fatalf("expected spent near 1.0 got %f", spent)
+	}
+}
+
+func TestWindowResetAfterExceeded(t *testing.T) {
+	m := NewManager(1.0)
+	key := "exceeded"
+	// Drive spend over the limit
+	m.AddCost(key, 0.6)
+	m.AddCost(key, 0.5) // total 1.1 > 1.0
+	allowed, windowEnd, spent, lim := m.Allow(key)
+	if allowed || spent <= lim {
+		t.Fatalf("expected blocked after exceeding limit; allowed=%v spent=%f lim=%f", allowed, spent, lim)
+	}
+	// Force window expiry
+	v, ok := m.perKey.Load(key)
+	if !ok {
+		t.Fatalf("expected key window present")
+	}
+	kw := v.(*keyWindow)
+	kw.mu.Lock()
+	kw.windowStart = time.Now().Add(-time.Hour - time.Second)
+	kw.mu.Unlock()
+	allowed2, _, spent2, _ := m.Allow(key)
+	if !allowed2 || spent2 != 0 {
+		t.Fatalf("expected allowance reset after window; allowed2=%v spent2=%f (oldWindowEnd=%s)", allowed2, spent2, windowEnd)
 	}
 }

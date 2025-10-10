@@ -240,7 +240,9 @@ func NewProxyHandler() http.Handler {
 		if allowed, windowEnd, spent, lim := mgr.Allow(auth); !allowed {
 			// Compute seconds until reset (window end)
 			secUntil := int(time.Until(windowEnd).Seconds())
-			if secUntil < 0 { secUntil = 0 }
+			if secUntil < 0 {
+				secUntil = 0
+			}
 			// Standard header for 429 retry guidance
 			w.Header().Set("Retry-After", strconv.Itoa(secUntil))
 			// Draft/RFC 9333 style RateLimit headers (informational)

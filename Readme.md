@@ -160,41 +160,6 @@ go test ./...
 go run main.go -openai-base-url=http://localhost:8080/v1
 ```
 
-## 📚 API Documentation
-
-GoXY is compatible with the OpenAI API specification. All endpoints that work with OpenAI's API will work with GoXY.
-
-### Supported Endpoints
-
-- `POST /v1/chat/completions` - Chat completions (streaming and non-streaming)
-- `GET /health` - Health check endpoint
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- OpenAI for the API specification
-- The Go community for excellent libraries
-- All contributors to this project
-
-## 📞 Support
-
-- 📧 Create an issue on GitHub
-- 💬 Join our discussions
-- 📖 Check the documentation
-
----
-
-**GoXY** - Making AI API proxying simple and efficient.

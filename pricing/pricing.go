@@ -34,16 +34,30 @@ type PriceResult struct {
 	Note              string
 }
 
-// Hard-coded per-1K token pricing (USD). These are illustrative and may not reflect current real pricing.
-// Update these values as pricing changes. (Numbers chosen for example.)
-var perK = map[Model]struct {
-	Prompt     float64
-	Completion float64
-}{
-	ModelGPT4:     {Prompt: 0.03, Completion: 0.06},
-	ModelGPT4o:    {Prompt: 0.005, Completion: 0.015},
-	ModelGPT5Mini: {Prompt: 0.003, Completion: 0.006},
-	ModelGPT5:     {Prompt: 0.01, Completion: 0.02},
+// getPricing returns the pricing for a given model from configuration
+func getPricing(model Model) (struct{ Prompt, Completion float64 }, error) {
+	cfg, err := GetConfig()
+	if err != nil {
+		return struct{ Prompt, Completion float64 }{}, fmt.Errorf("failed to load pricing config: %w", err)
+	}
+
+	pricing, found := cfg.FindModelPricing(string(model))
+	if found {
+		return struct{ Prompt, Completion float64 }{
+			Prompt:     pricing.Prompt,
+			Completion: pricing.Completion,
+		}, nil
+	}
+
+	// Fallback to default if configured
+	if cfg.Default != nil {
+		return struct{ Prompt, Completion float64 }{
+			Prompt:     cfg.Default.Prompt,
+			Completion: cfg.Default.Completion,
+		}, nil
+	}
+
+	return struct{ Prompt, Completion float64 }{}, fmt.Errorf("no pricing found for model %s", model)
 }
 
 // NormalizeModel tries to map a raw model string to one of our known buckets.
@@ -72,26 +86,35 @@ func NormalizeModel(raw string) Model {
 // ComputePrice calculates cost given usage and model.
 func ComputePrice(modelRaw string, u Usage) (PriceResult, error) {
 	m := NormalizeModel(modelRaw)
-	tiers, ok := perK[m]
-	if !ok {
+	tiers, err := getPricing(m)
+	if err != nil {
 		return PriceResult{Model: m, PromptTokens: u.PromptTokens, CompletionTokens: u.CompletionTokens, Note: "unknown model pricing"}, nil
 	}
-	// Apply cached prompt token discount (cached tokens cost 10% of normal prompt tokens)
+
+	// Get cached token discount from config
+	cfg, configErr := GetConfig()
+	cachedDiscount := 0.1 // default 90% discount
+	if configErr == nil && cfg.CachedTokenDiscount > 0 {
+		cachedDiscount = cfg.CachedTokenDiscount
+	}
+
+	// Apply cached prompt token discount (cached tokens cost a percentage of normal prompt tokens)
 	billedPromptTokens := float64(u.PromptTokens)
 	if u.PromptCachedTokens > 0 {
 		cached := u.PromptCachedTokens
 		if cached > u.PromptTokens {
 			cached = u.PromptTokens
 		}
-		// Effective billed prompt tokens: non-cached + 10% of cached
-		billedPromptTokens = float64(u.PromptTokens-cached) + 0.1*float64(cached)
+		// Effective billed prompt tokens: non-cached + discount% of cached
+		billedPromptTokens = float64(u.PromptTokens-cached) + cachedDiscount*float64(cached)
 	}
 	ptCost := (billedPromptTokens / 1000.0) * tiers.Prompt
 	ctCost := (float64(u.CompletionTokens) / 1000.0) * tiers.Completion
 	total := ptCost + ctCost
-	note := "prices hard-coded; verify against https://openai.com/api/pricing/"
+	note := "prices loaded from config; verify against https://openai.com/api/pricing/"
 	if u.PromptCachedTokens > 0 {
-		note += " (includes 90% discount for cached prompt tokens)"
+		discountPercent := int((1.0 - cachedDiscount) * 100)
+		note += fmt.Sprintf(" (includes %d%% discount for cached prompt tokens)", discountPercent)
 	}
 	return PriceResult{
 		Model:             m,

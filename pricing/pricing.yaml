@@ -1,0 +1,36 @@
+# Pricing configuration for different AI models
+# Prices are per 1000 tokens in USD
+# Update these values as pricing changes
+
+models:
+  gpt-4:
+    prompt: 0.03
+    completion: 0.06
+    aliases:
+      - "gpt-4-0613"
+  
+  gpt-4o:
+    prompt: 0.005
+    completion: 0.015
+    aliases:
+      - "gpt-4o-2024-08-06"
+  
+  gpt-5-mini:
+    prompt: 0.003
+    completion: 0.006
+    aliases:
+      - "gpt-5-mini-2025-08-07"
+  
+  gpt-5:
+    prompt: 0.01
+    completion: 0.02
+    aliases:
+      - "gpt-5-2025-08-07"
+
+# Default pricing for unknown models (optional)
+default:
+  prompt: 0.01
+  completion: 0.02
+  
+# Cached token discount (percentage of original cost)
+cached_token_discount: 0.1  # 90% discount = 10% of original cost

@@ -18,66 +18,6 @@ import (
 	"github.com/goverture/goxy/pricing"
 )
 
-// sseLoggingBody wraps an SSE (text/event-stream) body, logging each JSON event line as it passes through
-type sseLoggingBody struct {
-	rc  io.ReadCloser
-	buf bytes.Buffer // accumulate partial lines between Read calls
-}
-
-func (s *sseLoggingBody) Read(p []byte) (int, error) {
-	n, err := s.rc.Read(p)
-	if n > 0 {
-		// Feed the newly read bytes into line processor
-		s.processChunk(p[:n])
-	}
-	return n, err
-}
-
-func (s *sseLoggingBody) Close() error { return s.rc.Close() }
-
-func (s *sseLoggingBody) processChunk(chunk []byte) {
-	// Append to buffer
-	s.buf.Write(chunk)
-	for {
-		data := s.buf.Bytes()
-		idx := bytes.IndexByte(data, '\n')
-		if idx == -1 { // no complete line yet
-			return
-		}
-		// Extract line including up to idx
-		line := string(data[:idx])
-		// Remove this line + newline from buffer
-		s.buf.Next(idx + 1)
-		s.handleLine(strings.TrimRight(line, "\r"))
-	}
-}
-
-func (s *sseLoggingBody) handleLine(line string) {
-	line = strings.TrimSpace(line)
-	if line == "" {
-		return
-	}
-	if !strings.HasPrefix(line, "data:") {
-		return
-	}
-	payload := strings.TrimSpace(line[len("data:"):])
-	if payload == "[DONE]" { // termination event
-		fmt.Println("[proxy] SSE event: [DONE]")
-		return
-	}
-	// Attempt JSON parse if looks like JSON
-	if strings.HasPrefix(payload, "{") || strings.HasPrefix(payload, "[") {
-		var v interface{}
-		if err := json.Unmarshal([]byte(payload), &v); err == nil {
-			pretty, _ := json.MarshalIndent(v, "", "  ")
-			fmt.Println("[proxy] SSE event JSON:\n" + string(pretty))
-			return
-		}
-	}
-	// Fallback raw payload
-	fmt.Println("[proxy] SSE raw event:", payload)
-}
-
 // stripForwardingHeaders removes X-Forwarded-* and similar before the upstream call.
 type stripForwardingHeaders struct{ base http.RoundTripper }
 
@@ -110,7 +50,7 @@ func NewProxyHandler() http.Handler {
 		// Ensure correct Host/SNI for upstream/WAF
 		r.Host = upHost
 
-		// Low-latency streaming: avoid gzip buffering
+		// Low-latency: avoid gzip buffering
 		r.Header.Del("Accept-Encoding")
 
 		// Stable UA (some WAFs dislike empty UA)
@@ -122,9 +62,6 @@ func NewProxyHandler() http.Handler {
 		// if key := os.Getenv("OPENAI_API_KEY"); key != "" {
 		// 	r.Header.Set("Authorization", "Bearer "+key)
 		// }
-
-		// Helpful for SSE
-		r.Header.Set("Cache-Control", "no-cache")
 		// Forward proto info if not present
 		if r.Header.Get("X-Forwarded-Proto") == "" {
 			if r.TLS != nil {
@@ -143,19 +80,15 @@ func NewProxyHandler() http.Handler {
 		}
 	}
 
-	// Stream-friendly transport, wrapped to strip X-Forwarded-* headers
+	// Transport configuration
 	baseTransport := &http.Transport{
 		Proxy:               http.ProxyFromEnvironment,
-		ForceAttemptHTTP2:   true, // gRPC/http2 streams pass through
+		ForceAttemptHTTP2:   true,
 		MaxIdleConns:        100,
 		IdleConnTimeout:     90 * time.Second,
 		TLSHandshakeTimeout: 10 * time.Second,
-		DisableCompression:  true, // don't re-compress/buffer
 	}
 	proxy.Transport = stripForwardingHeaders{base: baseTransport}
-
-	// Flush chunks quickly (good for token streams)
-	proxy.FlushInterval = 50 * time.Millisecond
 
 	// Add CORS on the way out (useful for browsers) + disable buffering on some proxies
 	// Additionally, intercept JSON responses to log their contents before forwarding.
@@ -166,12 +99,11 @@ func NewProxyHandler() http.Handler {
 			h.Set("Access-Control-Allow-Origin", origin)
 			h.Set("Vary", "Origin")
 			h.Set("Access-Control-Expose-Headers", "Content-Type, OpenAI-Processing-Ms")
-			h.Set("X-Accel-Buffering", "no")
 		}
 
 		ct := resp.Header.Get("Content-Type")
-		// JSON (non-SSE) full-body logging
-		if strings.Contains(ct, "application/json") && !strings.Contains(ct, "text/event-stream") && resp.Body != nil {
+		// JSON full-body logging
+		if strings.Contains(ct, "application/json") && resp.Body != nil {
 			bodyBytes, err := io.ReadAll(resp.Body)
 			if err != nil {
 				// Restore an empty body so downstream doesn't panic
@@ -214,9 +146,6 @@ func NewProxyHandler() http.Handler {
 			} else {
 				fmt.Println("[proxy] Failed to parse JSON response:", err)
 			}
-		} else if strings.Contains(ct, "text/event-stream") && resp.Body != nil {
-			// Wrap SSE body to log events as they stream; do not buffer entire stream
-			resp.Body = &sseLoggingBody{rc: resp.Body}
 		}
 		return nil
 	}

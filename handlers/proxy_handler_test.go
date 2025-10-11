@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/goverture/goxy/config"
 	"github.com/goverture/goxy/pricing"
@@ -136,63 +135,6 @@ func TestProxy_LogsParsedJSONResponse(t *testing.T) {
 	}
 	if !strings.Contains(outStr, `"status": "from-upstream"`) {
 		t.Fatalf("expected pretty JSON in logs, got: %s", outStr)
-	}
-}
-
-func TestProxy_LogsSSEStream(t *testing.T) {
-	// Simulated SSE upstream (two JSON events + [DONE])
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/event-stream")
-		flusher, _ := w.(http.Flusher)
-		events := []string{
-			`data: {"step":1,"msg":"hello"}`,
-			`data: {"step":2,"msg":"world"}`,
-			`data: [DONE]`,
-		}
-		for _, e := range events {
-			_, _ = w.Write([]byte(e + "\n"))
-			if flusher != nil {
-				flusher.Flush()
-			}
-			time.Sleep(5 * time.Millisecond)
-		}
-	}))
-	defer upstream.Close()
-
-	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL}
-	h := NewProxyHandler()
-
-	// Capture stdout for logging assertions
-	oldStdout := os.Stdout
-	rPipe, wPipe, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("pipe err: %v", err)
-	}
-	os.Stdout = wPipe
-
-	req := httptest.NewRequest(http.MethodGet, "http://proxy.local/v1/stream", nil)
-	rr := httptest.NewRecorder()
-	h.ServeHTTP(rr, req)
-
-	// Finish capture
-	wPipe.Close()
-	os.Stdout = oldStdout
-	logged, _ := io.ReadAll(rPipe)
-	outStr := string(logged)
-
-	// Response should be the concatenated SSE data as written (we won't assert exact because newline timing) but status 200
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", rr.Code)
-	}
-	// Ensure logging of each JSON event
-	if !strings.Contains(outStr, `"step": 1`) {
-		t.Fatalf("missing first event JSON log: %s", outStr)
-	}
-	if !strings.Contains(outStr, `"step": 2`) {
-		t.Fatalf("missing second event JSON log: %s", outStr)
-	}
-	if !strings.Contains(outStr, "SSE event: [DONE]") {
-		t.Fatalf("missing done marker log: %s", outStr)
 	}
 }
 

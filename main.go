@@ -10,7 +10,17 @@ import (
 	"github.com/goverture/goxy/handlers"
 )
 
+var (
+	// Version information - will be set during build
+	Version   = "dev"
+	BuildTime = "unknown"
+	GitCommit = "unknown"
+)
+
 func main() {
+	// Print version information
+	log.Printf("GoXY v%s (built %s, commit %s)", Version, BuildTime, GitCommit)
+
 	// Parse CLI flags
 	config.Cfg = config.ParseConfig()
 

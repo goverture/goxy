@@ -1,3 +1,7 @@
 .env
 __debug*
 goxy
+dist/
+coverage.out
+coverage.html
+.internal/

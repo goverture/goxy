@@ -1,12 +1,12 @@
 name: Tests
 
 on:
-  # Run tests on pushes to any branch
+  # Run tests on pushes to main/master branches
   push:
+    branches: [ master ]
   
-  # Run tests on pull requests to main branch
+  # Run tests on pull requests
   pull_request:
-    branches: [ main, master ]
   
   # Allow manual triggering of the workflow
   workflow_dispatch:

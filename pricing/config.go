@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 
 	"gopkg.in/yaml.v3"
@@ -82,8 +83,16 @@ func ResetConfig() {
 
 // getCurrentFilePath returns the path of this source file
 func getCurrentFilePath() string {
-	// This is a simple approach - in production you might want a more robust solution
-	return "/workspaces/Go/goxy/pricing/config.go"
+	// Use runtime.Caller to get the actual file path
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		// Fallback - try relative to working directory
+		if wd, err := os.Getwd(); err == nil {
+			return filepath.Join(wd, "pricing", "config.go")
+		}
+		return "config.go" // last resort
+	}
+	return filename
 }
 
 // FindModelPricing looks up pricing for a model, checking aliases

@@ -11,7 +11,27 @@ import (
 	"time"
 
 	"github.com/goverture/goxy/config"
+	"github.com/goverture/goxy/pricing"
 )
+
+// setupTestPricingConfig ensures pricing configuration is available for tests
+func setupTestPricingConfig() {
+	testConfig := &pricing.PricingConfig{
+		Models: map[string]pricing.ModelPricing{
+			"gpt-4o": {
+				Prompt:     0.005,
+				Completion: 0.015,
+				Aliases:    []string{"gpt-4o-2024-08-06"},
+			},
+		},
+		Default: &pricing.ModelPricing{
+			Prompt:     0.01,
+			Completion: 0.02,
+		},
+		CachedTokenDiscount: 0.1,
+	}
+	pricing.SetConfig(testConfig)
+}
 
 func TestProxy_ForwardsMethodPathQueryBodyAndHeaders(t *testing.T) {
 	// Upstream fake server to capture what we receive
@@ -177,6 +197,9 @@ func TestProxy_LogsSSEStream(t *testing.T) {
 }
 
 func TestProxy_SpendLimitExceeded(t *testing.T) {
+	// Setup pricing configuration for tests
+	setupTestPricingConfig()
+
 	// Upstream server that returns pricing-eligible JSON (model + usage)
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

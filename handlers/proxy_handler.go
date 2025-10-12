@@ -137,10 +137,9 @@ func NewProxyHandler() http.Handler {
 					}
 					if pr, err := pricing.ComputePrice(modelName, u); err == nil {
 						fmt.Println(pr.String())
-						// accumulate cost toward spend limit (use API key passed via header earlier)
-						if apiKey := resp.Request.Header.Get("X-Proxy-API-Key"); apiKey != "" {
-							mgr.AddCost(apiKey, pr.TotalCostUSD)
-						}
+						// accumulate cost toward spend limit (use Authorization header as-is, or blank for unauthenticated)
+						auth := resp.Request.Header.Get("Authorization")
+						mgr.AddCost(auth, pr.TotalCostUSD)
 					}
 				}
 			} else {
@@ -155,17 +154,15 @@ func NewProxyHandler() http.Handler {
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Extract the authorization key from the request header
+		// Extract the authorization header as-is
 		auth := r.Header.Get("Authorization")
 
-		// Remove the "Bearer " prefix if it exists
-		if len(auth) > 7 && auth[:7] == "Bearer " {
-			auth = auth[7:]
+		// Just warn if no auth header, don't block the request
+		if auth == "" {
+			fmt.Println("Warning: No Authorization header provided")
 		}
 
-		fmt.Println("Received API Key:", auth) // Debug log to verify the extracted key
-
-		// Spend limit check BEFORE proxy
+		// Spend limit check BEFORE proxy (always check, use blank string for unauthenticated)
 		if allowed, windowEnd, spent, lim := mgr.Allow(auth); !allowed {
 			// Compute seconds until reset (window end)
 			secUntil := int(time.Until(windowEnd).Seconds())
@@ -185,11 +182,6 @@ func NewProxyHandler() http.Handler {
 			w.WriteHeader(http.StatusTooManyRequests)
 			fmt.Fprintf(w, `{"error":"spend limit exceeded","limit_per_hour":%.2f,"spent_this_window":%.4f,"window_ends_at":"%s","retry_after_seconds":%d}`, lim, spent, windowEnd.UTC().Format(time.RFC3339), secUntil)
 			return
-		}
-
-		// Pass stripped key to response modifier for accumulation
-		if auth != "" {
-			r.Header.Set("X-Proxy-API-Key", auth)
 		}
 
 		proxy.ServeHTTP(w, r)

@@ -202,3 +202,56 @@ func TestProxy_ZeroLimitBlocksImmediately(t *testing.T) {
 		t.Fatalf("expected spend limit message in body: %s", rr.Body.String())
 	}
 }
+
+func TestProxy_UnauthenticatedRequestsBypassLimits(t *testing.T) {
+	// Setup pricing configuration for tests
+	setupTestPricingConfig()
+
+	// Upstream server that returns pricing-eligible JSON
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		// Large cost per request to test that unauthenticated requests bypass limits
+		w.Write([]byte(`{"model":"gpt-4o","usage":{"prompt_tokens":1000,"completion_tokens":0}}`))
+	}))
+	defer upstream.Close()
+
+	// Very low spend limit that would normally block requests
+	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL, SpendLimitPerHour: 0.001}
+	h := NewProxyHandler()
+
+	doUnauthenticatedReq := func() *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "http://proxy.local/v1/chat/completions", nil)
+		// No Authorization header
+		rr := httptest.NewRecorder()
+		h.ServeHTTP(rr, req)
+		return rr
+	}
+
+	// Both unauthenticated requests should be allowed (bypass spend limits)
+	if rr := doUnauthenticatedReq(); rr.Code != http.StatusOK {
+		t.Fatalf("first unauthenticated request unexpected status %d body=%s", rr.Code, rr.Body.String())
+	}
+
+	if rr := doUnauthenticatedReq(); rr.Code != http.StatusOK {
+		t.Fatalf("second unauthenticated request unexpected status %d body=%s", rr.Code, rr.Body.String())
+	}
+
+	// But authenticated requests with the same key should be limited
+	doAuthenticatedReq := func() *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "http://proxy.local/v1/chat/completions", nil)
+		req.Header.Set("Authorization", "Bearer test-key")
+		rr := httptest.NewRecorder()
+		h.ServeHTTP(rr, req)
+		return rr
+	}
+
+	// First authenticated request should be allowed
+	if rr := doAuthenticatedReq(); rr.Code != http.StatusOK {
+		t.Fatalf("first authenticated request unexpected status %d body=%s", rr.Code, rr.Body.String())
+	}
+
+	// Second authenticated request should be blocked due to accumulated cost
+	if rr := doAuthenticatedReq(); rr.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected 429 on second authenticated request, got %d body=%s", rr.Code, rr.Body.String())
+	}
+}

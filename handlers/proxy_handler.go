@@ -31,7 +31,7 @@ func (t stripForwardingHeaders) RoundTrip(r *http.Request) (*http.Response, erro
 	return t.base.RoundTrip(r)
 }
 
-func NewProxyHandler() http.Handler {
+func NewProxyHandler() (http.Handler, *limit.Manager) {
 	// Spend limit manager
 	mgr := limit.NewManager(config.Cfg.SpendLimitPerHour)
 	upstreamURL := config.Cfg.OpenAIBaseURL
@@ -185,5 +185,5 @@ func NewProxyHandler() http.Handler {
 		}
 
 		proxy.ServeHTTP(w, r)
-	})
+	}), mgr
 }

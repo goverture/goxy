@@ -83,3 +83,112 @@ func (m *Manager) getKW(key string) *keyWindow {
 	actual, _ := m.perKey.LoadOrStore(key, kw)
 	return actual.(*keyWindow)
 }
+
+// UsageInfo holds information about a key's current usage window
+type UsageInfo struct {
+	Key         string    `json:"key"`
+	SpentUSD    float64   `json:"spent_usd"`
+	LimitUSD    float64   `json:"limit_usd"`
+	WindowStart time.Time `json:"window_start"`
+	WindowEnd   time.Time `json:"window_end"`
+	Remaining   float64   `json:"remaining_usd"`
+	Allowed     bool      `json:"allowed"`
+}
+
+// GetUsage returns usage information for a specific key
+func (m *Manager) GetUsage(key string) UsageInfo {
+	lim := m.limit
+	now := time.Now()
+	
+	if key == "" {
+		return UsageInfo{
+			Key:         "anonymous",
+			SpentUSD:    0,
+			LimitUSD:    lim,
+			WindowStart: now,
+			WindowEnd:   now.Add(time.Hour),
+			Remaining:   lim,
+			Allowed:     lim != 0,
+		}
+	}
+	
+	if lim < 0 {
+		return UsageInfo{
+			Key:         key,
+			SpentUSD:    0,
+			LimitUSD:    lim,
+			WindowStart: now,
+			WindowEnd:   now.Add(time.Hour),
+			Remaining:   -1, // unlimited
+			Allowed:     true,
+		}
+	}
+	
+	kw := m.getKW(key)
+	kw.mu.Lock()
+	if now.Sub(kw.windowStart) >= time.Hour {
+		kw.windowStart = now
+		kw.spentUSD = 0
+	}
+	windowEnd := kw.windowStart.Add(time.Hour)
+	spent := kw.spentUSD
+	kw.mu.Unlock()
+	
+	remaining := lim - spent
+	if remaining < 0 {
+		remaining = 0
+	}
+	
+	return UsageInfo{
+		Key:         key,
+		SpentUSD:    spent,
+		LimitUSD:    lim,
+		WindowStart: kw.windowStart,
+		WindowEnd:   windowEnd,
+		Remaining:   remaining,
+		Allowed:     spent < lim,
+	}
+}
+
+// GetAllUsage returns usage information for all tracked keys
+func (m *Manager) GetAllUsage() []UsageInfo {
+	var usage []UsageInfo
+	now := time.Now()
+	
+	m.perKey.Range(func(key, value interface{}) bool {
+		keyStr := key.(string)
+		kw := value.(*keyWindow)
+		
+		kw.mu.Lock()
+		if now.Sub(kw.windowStart) >= time.Hour {
+			kw.windowStart = now
+			kw.spentUSD = 0
+		}
+		windowEnd := kw.windowStart.Add(time.Hour)
+		spent := kw.spentUSD
+		kw.mu.Unlock()
+		
+		remaining := m.limit - spent
+		if remaining < 0 {
+			remaining = 0
+		}
+		
+		usage = append(usage, UsageInfo{
+			Key:         keyStr,
+			SpentUSD:    spent,
+			LimitUSD:    m.limit,
+			WindowStart: kw.windowStart,
+			WindowEnd:   windowEnd,
+			Remaining:   remaining,
+			Allowed:     m.limit < 0 || spent < m.limit,
+		})
+		return true
+	})
+	
+	return usage
+}
+
+// UpdateLimit updates the spending limit for the manager
+func (m *Manager) UpdateLimit(newLimit float64) {
+	m.limit = newLimit
+}

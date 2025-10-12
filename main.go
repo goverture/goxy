@@ -27,8 +27,14 @@ func main() {
 	// Print the config
 	log.Printf("Config: %+v", config.Cfg)
 
-	h := cors(handlers.NewProxyHandler())
+	// Create proxy handler and get limit manager
+	proxyHandler, limitMgr := handlers.NewProxyHandler()
+	h := cors(proxyHandler)
 
+	// Create admin handler
+	adminHandler := handlers.NewAdminHandler(limitMgr)
+
+	// Setup proxy server
 	addr := ":" + itoa(config.Cfg.Port)
 	srv := &http.Server{
 		Addr:         addr,
@@ -38,7 +44,27 @@ func main() {
 		IdleTimeout:  120 * time.Second,
 	}
 
-	log.Printf("Proxying to %+v on %s", config.Cfg, srv.Addr)
+	// Setup admin server
+	adminAddr := ":" + itoa(config.Cfg.AdminPort)
+	adminSrv := &http.Server{
+		Addr:         adminAddr,
+		Handler:      adminHandler,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
+
+	log.Printf("Proxying to %s on %s", config.Cfg.OpenAIBaseURL, srv.Addr)
+	log.Printf("Admin API listening on %s", adminSrv.Addr)
+
+	// Start admin server in background
+	go func() {
+		if err := adminSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Admin server failed: %v", err)
+		}
+	}()
+
+	// Start main proxy server (blocking)
 	log.Fatal(srv.ListenAndServe())
 }
 

@@ -2,11 +2,35 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/goverture/goxy/limit"
 )
+
+// maskAPIKey masks an API key to show only first 4 and last 4 characters
+// e.g., "Bearer sk-1234567890abcdef" becomes "sk-1234...cdef"
+func maskAPIKey(key string) string {
+	if key == "" || key == "anonymous" {
+		return key
+	}
+
+	// Handle "Bearer " prefix
+	if len(key) > 7 && key[:7] == "Bearer " {
+		token := key[7:] // Remove "Bearer " prefix
+		if len(token) <= 8 {
+			// Too short to mask meaningfully
+			return "Bearer " + token[:4] + "..."
+		}
+		return "Bearer " + token[:4] + "..." + token[len(token)-4:]
+	}
+
+	// Handle raw token
+	if len(key) <= 8 {
+		// Too short to mask meaningfully
+		return key[:4] + "..."
+	}
+	return key[:4] + "..." + key[len(key)-4:]
+}
 
 // AdminHandler provides endpoints for monitoring usage and updating limits
 type AdminHandler struct {
@@ -77,26 +101,19 @@ func (ah *AdminHandler) handleUsage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if a specific key is requested
-	key := r.URL.Query().Get("key")
+	// Return usage for all keys (no individual key queries for security)
+	usage := ah.manager.GetAllUsage()
 
-	if key != "" {
-		// Return usage for specific key
-		usage := ah.manager.GetUsage(key)
-		response := UsageResponse{
-			Usage: []limit.UsageInfo{usage},
-			Total: 1,
-		}
-		json.NewEncoder(w).Encode(response)
-	} else {
-		// Return usage for all keys
-		usage := ah.manager.GetAllUsage()
-		response := UsageResponse{
-			Usage: usage,
-			Total: len(usage),
-		}
-		json.NewEncoder(w).Encode(response)
+	// Mask the keys for security
+	for i := range usage {
+		usage[i].Key = maskAPIKey(usage[i].Key)
 	}
+
+	response := UsageResponse{
+		Usage: usage,
+		Total: len(usage),
+	}
+	json.NewEncoder(w).Encode(response)
 }
 
 // handleLimit handles PUT requests for updating spending limits
@@ -129,7 +146,7 @@ func (ah *AdminHandler) handleLimit(w http.ResponseWriter, r *http.Request) {
 	ah.manager.UpdateLimit(req.LimitUSD)
 
 	response := LimitUpdateResponse{
-		Message:     fmt.Sprintf("Spending limit updated successfully"),
+		Message:     "Spending limit updated successfully",
 		OldLimitUSD: oldLimit,
 		NewLimitUSD: req.LimitUSD,
 	}

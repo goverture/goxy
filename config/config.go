@@ -23,6 +23,15 @@ func ParseConfig() *Config {
 	pflag.StringVarP(&cfg.OpenAIBaseURL, "openai-base-url", "u", "https://api.openai.com", "OpenAI API base URL")
 	pflag.IntVarP(&cfg.Port, "port", "p", 8080, "Port to listen on")
 	pflag.Float64VarP(&cfg.SpendLimitPerHour, "spend-limit-per-hour", "l", 2.0, "Per-API-key spend limit USD per hour ( <0 disable, 0 block all )")
+
+	var showVersion bool
+	pflag.BoolVarP(&showVersion, "version", "v", false, "Show version and exit")
 	pflag.Parse()
+
+	if showVersion {
+		// Version info will be set during build via -ldflags
+		println("GoXY version:", Version)
+	}
+
 	return cfg
 }

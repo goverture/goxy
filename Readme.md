@@ -1,9 +1,12 @@
 # Goxy 🕸️
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/goverture/goxy.svg)](https://pkg.go.dev/github.com/goverture/goxy)
-[![GitHub release](https://img.shields.io/github/v/release/goverture/goxy)](https://github.com/goverture/goxy/releases)
-
 Lightweight **OpenAI API proxy** with **spending limits**. Drop it in front of your app to control usage & avoid surprise bills.
+
+## Features
+
+- [x] Hourly spending limit (once exceeded the proxy will return 429)
+- [ ] Admin port (view/update limit and usage)
+- [ ] Support for streaming requests (currently only synchronous requests are supported)
 
 ## 🚀 Install
 
@@ -11,28 +14,42 @@ Lightweight **OpenAI API proxy** with **spending limits**. Drop it in front of y
 go install github.com/goverture/goxy@latest
 ```
 
-## ⚙️ Run
+## ⚙️ Example
+
+Run the proxy
 
 ```bash
-goxy --listen :8080 --upstream https://api.openai.com --limit 20
+# 1.5$ per hour spending limit
+goxy -l 1.5
 ```
 
 Then point your app to `http://localhost:8080`.
 
-## 🧰 Env (optional)
-
-```bash
-GOXY_LISTEN=:8080
-GOXY_UPSTREAM=https://api.openai.com
-GOXY_LIMIT=20
-goxy
+```
+curl -v http://localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gpt-4o","messages":[{"role":"user","content":"What is the capital of France?"}]}'
 ```
 
-## 🏷️ Release
+Or in Python
 
-```bash
-git tag -s v1.0.0 -m "v1.0.0"
-git push origin v1.0.0
+```
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=os.environ.get("OPENAI_API_KEY"),
+    base_url="http://localhost:8080/v1"
+)
+
+response = client.responses.create(
+    model="gpt-4o",
+    instructions="You are a coding assistant that talks like a pirate.",
+    input="How do I check if a Python object is an instance of a class?",
+)
+
+print(response.output_text)
 ```
 
 ## 📜 License

@@ -52,6 +52,23 @@ response = client.responses.create(
 print(response.output_text)
 ```
 
+## Admin API
+
+Admin interface runs on port 8081 (configurable with `-a`).
+
+```bash
+# View usage
+curl http://localhost:8081/usage
+
+# Update spending limit
+curl -X PUT http://localhost:8081/limit \
+  -H "Content-Type: application/json" \
+  -d '{"limit_usd": 5.0}'
+
+# Health check
+curl http://localhost:8081/health
+```
+
 ## 📜 License
 
 MIT

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/goverture/goxy/config"
+	"github.com/goverture/goxy/limit"
 	"github.com/goverture/goxy/pricing"
 )
 
@@ -54,7 +55,8 @@ func TestProxy_ForwardsMethodPathQueryBodyAndHeaders(t *testing.T) {
 		OpenAIBaseURL: upstream.URL,
 	}
 
-	h := NewProxyHandler()
+	mgr := limit.NewManager(2.0) // Default limit for basic tests
+	h := NewProxyHandler(mgr)
 
 	// Build a request that would hit our proxy
 	body := bytes.NewBufferString(`{"hello":"world"}`)
@@ -101,7 +103,8 @@ func TestProxy_LogsParsedJSONResponse(t *testing.T) {
 
 	// Configure proxy
 	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL}
-	h := NewProxyHandler()
+	mgr := limit.NewManager(2.0) // Default limit for logging tests
+	h := NewProxyHandler(mgr)
 
 	// Capture stdout
 	oldStdout := os.Stdout
@@ -152,7 +155,8 @@ func TestProxy_SpendLimitExceeded(t *testing.T) {
 
 	// Spend limit just above first request cost so second pushes over limit; third should be blocked
 	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL, SpendLimitPerHour: 0.0015}
-	h := NewProxyHandler()
+	mgr := limit.NewManager(0.0015)
+	h := NewProxyHandler(mgr)
 
 	doReq := func() *httptest.ResponseRecorder {
 		req := httptest.NewRequest(http.MethodPost, "http://proxy.local/v1/chat/completions", nil)
@@ -188,7 +192,8 @@ func TestProxy_ZeroLimitBlocksImmediately(t *testing.T) {
 
 	// Zero limit => every non-anonymous key blocked right away
 	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL, SpendLimitPerHour: 0}
-	h := NewProxyHandler()
+	mgr := limit.NewManager(0)
+	h := NewProxyHandler(mgr)
 
 	req := httptest.NewRequest(http.MethodGet, "http://proxy.local/v1/test", nil)
 	req.Header.Set("Authorization", "Bearer zero-key")
@@ -217,7 +222,8 @@ func TestProxy_UnauthenticatedRequestsBypassLimits(t *testing.T) {
 
 	// Very low spend limit that would normally block requests
 	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL, SpendLimitPerHour: 0.001}
-	h := NewProxyHandler()
+	mgr := limit.NewManager(0.001)
+	h := NewProxyHandler(mgr)
 
 	doUnauthenticatedReq := func() *httptest.ResponseRecorder {
 		req := httptest.NewRequest(http.MethodPost, "http://proxy.local/v1/chat/completions", nil)

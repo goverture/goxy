@@ -8,6 +8,7 @@ import (
 
 	"github.com/goverture/goxy/config"
 	"github.com/goverture/goxy/handlers"
+	"github.com/goverture/goxy/limit"
 )
 
 var (
@@ -27,8 +28,11 @@ func main() {
 	// Print the config
 	log.Printf("Config: %+v", config.Cfg)
 
-	// Create proxy handler and get limit manager
-	proxyHandler, limitMgr := handlers.NewProxyHandler()
+	// Create limit manager
+	limitMgr := limit.NewManager(config.Cfg.SpendLimitPerHour)
+
+	// Create proxy handler and admin handler
+	proxyHandler := handlers.NewProxyHandler(limitMgr)
 	h := cors(proxyHandler)
 
 	// Create admin handler

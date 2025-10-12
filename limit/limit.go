@@ -99,7 +99,7 @@ type UsageInfo struct {
 func (m *Manager) GetUsage(key string) UsageInfo {
 	lim := m.limit
 	now := time.Now()
-	
+
 	if key == "" {
 		return UsageInfo{
 			Key:         "anonymous",
@@ -111,7 +111,7 @@ func (m *Manager) GetUsage(key string) UsageInfo {
 			Allowed:     lim != 0,
 		}
 	}
-	
+
 	if lim < 0 {
 		return UsageInfo{
 			Key:         key,
@@ -123,7 +123,7 @@ func (m *Manager) GetUsage(key string) UsageInfo {
 			Allowed:     true,
 		}
 	}
-	
+
 	kw := m.getKW(key)
 	kw.mu.Lock()
 	if now.Sub(kw.windowStart) >= time.Hour {
@@ -133,12 +133,12 @@ func (m *Manager) GetUsage(key string) UsageInfo {
 	windowEnd := kw.windowStart.Add(time.Hour)
 	spent := kw.spentUSD
 	kw.mu.Unlock()
-	
+
 	remaining := lim - spent
 	if remaining < 0 {
 		remaining = 0
 	}
-	
+
 	return UsageInfo{
 		Key:         key,
 		SpentUSD:    spent,
@@ -154,11 +154,11 @@ func (m *Manager) GetUsage(key string) UsageInfo {
 func (m *Manager) GetAllUsage() []UsageInfo {
 	var usage []UsageInfo
 	now := time.Now()
-	
+
 	m.perKey.Range(func(key, value interface{}) bool {
 		keyStr := key.(string)
 		kw := value.(*keyWindow)
-		
+
 		kw.mu.Lock()
 		if now.Sub(kw.windowStart) >= time.Hour {
 			kw.windowStart = now
@@ -167,12 +167,12 @@ func (m *Manager) GetAllUsage() []UsageInfo {
 		windowEnd := kw.windowStart.Add(time.Hour)
 		spent := kw.spentUSD
 		kw.mu.Unlock()
-		
+
 		remaining := m.limit - spent
 		if remaining < 0 {
 			remaining = 0
 		}
-		
+
 		usage = append(usage, UsageInfo{
 			Key:         keyStr,
 			SpentUSD:    spent,
@@ -184,7 +184,7 @@ func (m *Manager) GetAllUsage() []UsageInfo {
 		})
 		return true
 	})
-	
+
 	return usage
 }
 

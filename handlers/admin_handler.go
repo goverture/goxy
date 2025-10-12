@@ -39,7 +39,7 @@ type LimitUpdateResponse struct {
 // ServeHTTP handles admin requests
 func (ah *AdminHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	
+
 	// Add CORS headers for admin endpoints
 	if origin := r.Header.Get("Origin"); origin != "" {
 		w.Header().Set("Access-Control-Allow-Origin", origin)
@@ -47,12 +47,12 @@ func (ah *AdminHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		w.Header().Set("Access-Control-Allow-Methods", "GET,PUT,OPTIONS")
 	}
-	
+
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	
+
 	switch r.URL.Path {
 	case "/usage":
 		ah.handleUsage(w, r)
@@ -63,7 +63,7 @@ func (ah *AdminHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(map[string]string{
-			"error": "endpoint not found",
+			"error":               "endpoint not found",
 			"available_endpoints": "/usage, /limit, /health",
 		})
 	}
@@ -76,10 +76,10 @@ func (ah *AdminHandler) handleUsage(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"error": "method not allowed"})
 		return
 	}
-	
+
 	// Check if a specific key is requested
 	key := r.URL.Query().Get("key")
-	
+
 	if key != "" {
 		// Return usage for specific key
 		usage := ah.manager.GetUsage(key)
@@ -106,14 +106,14 @@ func (ah *AdminHandler) handleLimit(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"error": "method not allowed"})
 		return
 	}
-	
+
 	var req LimitUpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON: " + err.Error()})
 		return
 	}
-	
+
 	// Get current limit for response
 	allUsage := ah.manager.GetAllUsage()
 	var oldLimit float64
@@ -124,16 +124,16 @@ func (ah *AdminHandler) handleLimit(w http.ResponseWriter, r *http.Request) {
 		dummy := ah.manager.GetUsage("dummy")
 		oldLimit = dummy.LimitUSD
 	}
-	
+
 	// Update the limit
 	ah.manager.UpdateLimit(req.LimitUSD)
-	
+
 	response := LimitUpdateResponse{
 		Message:     fmt.Sprintf("Spending limit updated successfully"),
 		OldLimitUSD: oldLimit,
 		NewLimitUSD: req.LimitUSD,
 	}
-	
+
 	json.NewEncoder(w).Encode(response)
 }
 
@@ -143,11 +143,11 @@ func (ah *AdminHandler) HealthCheck(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status": "healthy",
+		"status":  "healthy",
 		"service": "goxy-admin",
 	})
 }

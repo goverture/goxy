@@ -64,6 +64,7 @@ func resolveModelName(raw string) string {
 
 	// Try direct lookup first
 	if _, exists := cfg.Models[raw]; exists {
+		fmt.Printf("[pricing] Model mapping: %q -> %q (exact match)\n", raw, raw)
 		return raw
 	}
 
@@ -79,6 +80,7 @@ func resolveModelName(raw string) string {
 	}
 
 	if bestMatch != "" {
+		fmt.Printf("[pricing] Model mapping: %q -> %q (prefix match)\n", raw, bestMatch)
 		return bestMatch
 	}
 
@@ -112,8 +114,8 @@ func ComputePrice(modelRaw string, u Usage) (PriceResult, error) {
 		// Effective billed prompt tokens: non-cached + discount% of cached
 		billedPromptTokens = float64(u.PromptTokens-cached) + cachedDiscount*float64(cached)
 	}
-	ptCost := (billedPromptTokens / 1000.0) * tiers.Prompt
-	ctCost := (float64(u.CompletionTokens) / 1000.0) * tiers.Completion
+	ptCost := (billedPromptTokens / 1000000.0) * tiers.Prompt
+	ctCost := (float64(u.CompletionTokens) / 1000000.0) * tiers.Completion
 	total := ptCost + ctCost
 	note := "prices loaded from config; verify against https://openai.com/api/pricing/"
 	if u.PromptCachedTokens > 0 {

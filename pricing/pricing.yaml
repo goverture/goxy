@@ -1,99 +1,117 @@
 # Pricing configuration for different AI text models from https://platform.openai.com/docs/pricing#text-tokens
-# Prices are per 1000 tokens in USD (standard pricing)
+# Prices are per 1 million tokens in USD (standard pricing)
 
 models:
   gpt-5:
-    prompt: 0.00125
-    cached_prompt: 0.000125
-    completion: 0.01
+    prompt: 1.25
+    cached_prompt: 0.125
+    completion: 10.0
 
   gpt-5-mini:
-    prompt: 0.00025
-    cached_prompt: 0.000025
-    completion: 0.002
+    prompt: 0.25
+    cached_prompt: 0.025
+    completion: 2.0
 
   gpt-5-nano:
-    prompt: 0.00005
-    cached_prompt: 0.000005
-    completion: 0.0004
+    prompt: 0.05
+    cached_prompt: 0.005
+    completion: 0.4
+
+  gpt-5-chat-latest:
+    prompt: 1.25
+    cached_prompt: 0.125
+    completion: 10.0
+
+  gpt-5-codex:
+    prompt: 1.25
+    cached_prompt: 0.125
+    completion: 10.0
 
   gpt-5-pro:
-    prompt: 0.015
-    completion: 0.12
+    prompt: 15.0
+    completion: 120.0
 
   gpt-4.1:
-    prompt: 0.002
-    cached_prompt: 0.0005
-    completion: 0.008
+    prompt: 2.0
+    cached_prompt: 0.5
+    completion: 8.0
 
   gpt-4.1-mini:
-    prompt: 0.0004
-    cached_prompt: 0.0001
-    completion: 0.0016
+    prompt: 0.4
+    cached_prompt: 0.1
+    completion: 1.6
 
   gpt-4.1-nano:
-    prompt: 0.0001
-    cached_prompt: 0.000025
-    completion: 0.0004
+    prompt: 0.1
+    cached_prompt: 0.025
+    completion: 0.4
 
   gpt-4o:
-    prompt: 0.0025
-    cached_prompt: 0.00125
-    completion: 0.01
+    prompt: 2.5
+    cached_prompt: 1.25
+    completion: 10.0
 
   gpt-4o-2024-05-13:
-    prompt: 0.005
-    completion: 0.015
+    prompt: 5.0
+    completion: 15.0
 
   gpt-4o-mini:
-    prompt: 0.00015
-    cached_prompt: 0.000075
-    completion: 0.0006
-
-  o1:
-    prompt: 0.015
-    cached_prompt: 0.0075
-    completion: 0.06
-
-  o1-pro:
     prompt: 0.15
+    cached_prompt: 0.075
     completion: 0.6
 
+  gpt-realtime:
+    prompt: 0.4
+    completion: 0.016
+
+  gpt-realtime-mini:
+    prompt: 0.06
+    completion: 0.0024
+
+  o1:
+    prompt: 15.0
+    cached_prompt: 7.5
+    completion: 60.0
+
+  o1-pro:
+    prompt: 150.0
+    completion: 600.0
+
   o3-pro:
-    prompt: 0.02
-    completion: 0.08
+    prompt: 20.0
+    completion: 80.0
 
   o3:
-    prompt: 0.002
-    cached_prompt: 0.0005
-    completion: 0.008
+    prompt: 2.0
+    cached_prompt: 0.5
+    completion: 8.0
 
   o3-deep-research:
-    prompt: 0.01
-    cached_prompt: 0.0025
-    completion: 0.04
+    prompt: 10.0
+    cached_prompt: 2.5
+    completion: 40.0
 
   o4-mini:
-    prompt: 0.0011
-    cached_prompt: 0.000275
-    completion: 0.0044
+    prompt: 1.1
+    cached_prompt: 0.275
+    completion: 4.4
 
   o4-mini-deep-research:
-    prompt: 0.002
-    cached_prompt: 0.0005
-    completion: 0.008
+    prompt: 2.0
+    cached_prompt: 0.5
+    completion: 8.0
 
   o3-mini:
-    prompt: 0.0011
-    cached_prompt: 0.00055
-    completion: 0.0044
+    prompt: 1.1
+    cached_prompt: 0.55
+    completion: 4.4
 
   o1-mini:
-    prompt: 0.0011
-    cached_prompt: 0.00055
-    completion: 0.0044
+    prompt: 1.1
+    cached_prompt: 0.55
+    completion: 4.4
 
 # Default pricing for unknown models (optional)
 default:
-  prompt: 0.01
-  completion: 0.02
+  prompt: 10.0
+  completion: 20.0

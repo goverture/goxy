@@ -61,12 +61,46 @@ models:
     completion: 0.6
 
   gpt-realtime:
-    prompt: 0.4
-    completion: 0.016
+    prompt: 4
+    cached_prompt: 0.4
+    completion: 16
 
   gpt-realtime-mini:
-    prompt: 0.06
-    completion: 0.0024
+    prompt: 0.6
+    cached_prompt: 0.06
+    completion: 2.4
+
+  # gpt-4o-realtime-preview	$5.00	$2.50	$20.00
+  gpt-4o-realtime-preview:
+    prompt: 5.0
+    cached_prompt: 2.5
+    completion: 20.0
+
+  # gpt-4o-mini-realtime-preview	$0.60	$0.30	$2.40
+  gpt-4o-mini-realtime-preview:
+    prompt: 0.6
+    cached_prompt: 0.3
+    completion: 2.4
+
+  # gpt-audio	$2.50	-	$10.00
+  gpt-audio:
+    prompt: 2.5
+    completion: 10.0
+  
+  # gpt-audio-mini	$0.60	-	$2.40
+  gpt-audio-mini:
+    prompt: 0.6
+    completion: 2.4
+
+  # gpt-4o-audio-preview	$2.50	-	$10.00
+  gpt-4o-audio-preview:
+    prompt: 2.5
+    completion: 10.0
+  
+  # gpt-4o-mini-audio-preview	$0.15	-	$0.60
+  gpt-4o-mini-audio-preview:
+    prompt: 0.15
+    completion: 0.6
 
   o1:
     prompt: 15.0
@@ -110,6 +144,37 @@ models:
     prompt: 1.1
     cached_prompt: 0.55
     completion: 4.4
+
+# codex-mini-latest	$1.50	$0.375	$6.00
+  codex-mini-latest:
+    prompt: 1.5
+    cached_prompt: 0.375
+    completion: 6.0
+
+# gpt-4o-mini-search-preview	$0.15	-	$0.60
+  gpt-4o-mini-search-preview:
+    prompt: 0.15
+    completion: 0.6
+
+# gpt-4o-search-preview	$2.50	-	$10.00
+  gpt-4o-search-preview:
+    prompt: 2.5
+    completion: 10.0
+
+# computer-use-preview	$3.00	-	$12.00
+  computer-use-preview:
+    prompt: 3.0
+    completion: 12.0    
+
+# gpt-image-1	$5.00	$1.25	-
+  gpt-image-1:
+    prompt: 5.0
+    cached_prompt: 1.25
+
+# gpt-image-1-mini	$2.00	$0.20	-
+  gpt-image-1-mini:
+    prompt: 2.0
+    cached_prompt: 0.2 
 
 # Default pricing for unknown models (optional)
 default:

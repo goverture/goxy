@@ -2,15 +2,8 @@ package pricing
 
 import "fmt"
 
-// Model represents a supported model for pricing.
+// Model represents a model name for pricing.
 type Model string
-
-const (
-	ModelGPT4     Model = "gpt-4"
-	ModelGPT4o    Model = "gpt-4o"
-	ModelGPT5Mini Model = "gpt-5-mini"
-	ModelGPT5     Model = "gpt-5" // placeholder name
-)
 
 // Usage contains token usage fields we care about.
 type Usage struct {
@@ -60,32 +53,43 @@ func getPricing(model Model) (struct{ Prompt, Completion float64 }, error) {
 	return struct{ Prompt, Completion float64 }{}, fmt.Errorf("no pricing found for model %s", model)
 }
 
-// NormalizeModel tries to map a raw model string to one of our known buckets.
-func NormalizeModel(raw string) Model {
-	switch {
-	case raw == "gpt-4" || raw == "gpt-4-0613":
-		return ModelGPT4
-	case raw == "gpt-4o" || raw == "gpt-4o-2024-08-06":
-		return ModelGPT4o
-	case raw == "gpt-5-mini" || raw == "gpt-5-mini-2025-08-07":
-		return ModelGPT5Mini
-	case raw == "gpt-5" || raw == "gpt-5-2025-08-07":
-		return ModelGPT5
-	default:
-		// naive fallback: detect prefix
-		if len(raw) >= 5 && raw[:5] == "gpt-4" {
-			return ModelGPT4
-		}
-		if len(raw) >= 5 && raw[:5] == "gpt-5" {
-			return ModelGPT5
-		}
-		return Model(raw)
+// resolveModelName determines the canonical model name to use for pricing lookup.
+// This first checks if the model exists directly in config, then tries to find the longest matching prefix.
+// If found via prefix match, returns the canonical name; otherwise returns the original name.
+func resolveModelName(raw string) string {
+	cfg, err := GetConfig()
+	if err != nil {
+		return raw // fallback to original name if config can't be loaded
 	}
+
+	// Try direct lookup first
+	if _, exists := cfg.Models[raw]; exists {
+		return raw
+	}
+
+	// Check for prefix matches - find the longest matching prefix
+	var bestMatch string
+
+	for configModel := range cfg.Models {
+		// Check if the input model name starts with this config model name
+		if len(configModel) > len(bestMatch) && len(raw) >= len(configModel) &&
+			raw[:len(configModel)] == configModel {
+			bestMatch = configModel
+		}
+	}
+
+	if bestMatch != "" {
+		return bestMatch
+	}
+
+	// Not found in config or via prefix, return as-is
+	return raw
 }
 
 // ComputePrice calculates cost given usage and model.
 func ComputePrice(modelRaw string, u Usage) (PriceResult, error) {
-	m := NormalizeModel(modelRaw)
+	modelName := resolveModelName(modelRaw)
+	m := Model(modelName)
 	tiers, err := getPricing(m)
 	if err != nil {
 		return PriceResult{Model: m, PromptTokens: u.PromptTokens, CompletionTokens: u.CompletionTokens, Note: "unknown model pricing"}, nil

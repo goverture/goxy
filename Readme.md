@@ -8,6 +8,14 @@ Lightweight **OpenAI API proxy** with **spending limits**. Drop it in front of y
 - [ ] Admin port (view/update limit and usage)
 - [ ] Support for streaming requests (currently only synchronous requests are supported)
 
+## Supported endpoints
+
+- [ ] Only chat/completions for now
+
+## Supported models
+
+- 
+
 ## 🚀 Install
 
 ```bash

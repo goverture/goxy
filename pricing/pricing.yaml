@@ -1,36 +1,99 @@
-# Pricing configuration for different AI models
-# Prices are per 1000 tokens in USD
-# Update these values as pricing changes
+# Pricing configuration for different AI text models from https://platform.openai.com/docs/pricing#text-tokens
+# Prices are per 1000 tokens in USD (standard pricing)
 
 models:
-  gpt-4:
-    prompt: 0.03
-    completion: 0.06
-    aliases:
-      - "gpt-4-0613"
-  
+  gpt-5:
+    prompt: 0.00125
+    cached_prompt: 0.000125
+    completion: 0.01
+
+  gpt-5-mini:
+    prompt: 0.00025
+    cached_prompt: 0.000025
+    completion: 0.002
+
+  gpt-5-nano:
+    prompt: 0.00005
+    cached_prompt: 0.000005
+    completion: 0.0004
+
+  gpt-5-pro:
+    prompt: 0.015
+    completion: 0.12
+
+  gpt-4.1:
+    prompt: 0.002
+    cached_prompt: 0.0005
+    completion: 0.008
+
+  gpt-4.1-mini:
+    prompt: 0.0004
+    cached_prompt: 0.0001
+    completion: 0.0016
+
+  gpt-4.1-nano:
+    prompt: 0.0001
+    cached_prompt: 0.000025
+    completion: 0.0004
+
   gpt-4o:
+    prompt: 0.0025
+    cached_prompt: 0.00125
+    completion: 0.01
+
+  gpt-4o-2024-05-13:
     prompt: 0.005
     completion: 0.015
-    aliases:
-      - "gpt-4o-2024-08-06"
-  
-  gpt-5-mini:
-    prompt: 0.003
-    completion: 0.006
-    aliases:
-      - "gpt-5-mini-2025-08-07"
-  
-  gpt-5:
+
+  gpt-4o-mini:
+    prompt: 0.00015
+    cached_prompt: 0.000075
+    completion: 0.0006
+
+  o1:
+    prompt: 0.015
+    cached_prompt: 0.0075
+    completion: 0.06
+
+  o1-pro:
+    prompt: 0.15
+    completion: 0.6
+
+  o3-pro:
+    prompt: 0.02
+    completion: 0.08
+
+  o3:
+    prompt: 0.002
+    cached_prompt: 0.0005
+    completion: 0.008
+
+  o3-deep-research:
     prompt: 0.01
-    completion: 0.02
-    aliases:
-      - "gpt-5-2025-08-07"
+    cached_prompt: 0.0025
+    completion: 0.04
+
+  o4-mini:
+    prompt: 0.0011
+    cached_prompt: 0.000275
+    completion: 0.0044
+
+  o4-mini-deep-research:
+    prompt: 0.002
+    cached_prompt: 0.0005
+    completion: 0.008
+
+  o3-mini:
+    prompt: 0.0011
+    cached_prompt: 0.00055
+    completion: 0.0044
+
+  o1-mini:
+    prompt: 0.0011
+    cached_prompt: 0.00055
+    completion: 0.0044
 
 # Default pricing for unknown models (optional)
 default:
   prompt: 0.01
   completion: 0.02
-  
-# Cached token discount (percentage of original cost)
-cached_token_discount: 0.1  # 90% discount = 10% of original cost

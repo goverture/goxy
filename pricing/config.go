@@ -95,20 +95,29 @@ func getCurrentFilePath() string {
 	return filename
 }
 
-// FindModelPricing looks up pricing for a model, checking aliases
+// FindModelPricing looks up pricing for a model, checking for matching prefixes
 func (cfg *PricingConfig) FindModelPricing(modelName string) (*ModelPricing, bool) {
-	// Direct lookup
+	// Direct lookup first
 	if pricing, exists := cfg.Models[modelName]; exists {
 		return &pricing, true
 	}
 
-	// Check aliases
-	for _, pricing := range cfg.Models {
-		for _, alias := range pricing.Aliases {
-			if alias == modelName {
-				return &pricing, true
-			}
+	// Check for prefix matches - find the longest matching prefix
+	var bestMatch string
+	var bestPricing *ModelPricing
+
+	for configModel, pricing := range cfg.Models {
+		// Check if the input model name starts with this config model name
+		if len(configModel) > len(bestMatch) && len(modelName) >= len(configModel) &&
+			modelName[:len(configModel)] == configModel {
+			bestMatch = configModel
+			pricingCopy := pricing // Create a copy to avoid pointer issues
+			bestPricing = &pricingCopy
 		}
+	}
+
+	if bestPricing != nil {
+		return bestPricing, true
 	}
 
 	return nil, false

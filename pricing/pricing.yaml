@@ -1,36 +1,182 @@
-# Pricing configuration for different AI models
-# Prices are per 1000 tokens in USD
-# Update these values as pricing changes
+# Pricing configuration for different AI text models from https://platform.openai.com/docs/pricing#text-tokens
+# Prices are per 1 million tokens in USD (standard pricing)
 
 models:
-  gpt-4:
-    prompt: 0.03
-    completion: 0.06
-    aliases:
-      - "gpt-4-0613"
-  
-  gpt-4o:
-    prompt: 0.005
-    completion: 0.015
-    aliases:
-      - "gpt-4o-2024-08-06"
-  
-  gpt-5-mini:
-    prompt: 0.003
-    completion: 0.006
-    aliases:
-      - "gpt-5-mini-2025-08-07"
-  
   gpt-5:
-    prompt: 0.01
-    completion: 0.02
-    aliases:
-      - "gpt-5-2025-08-07"
+    prompt: 1.25
+    cached_prompt: 0.125
+    completion: 10.0
+
+  gpt-5-mini:
+    prompt: 0.25
+    cached_prompt: 0.025
+    completion: 2.0
+
+  gpt-5-nano:
+    prompt: 0.05
+    cached_prompt: 0.005
+    completion: 0.4
+
+  gpt-5-chat-latest:
+    prompt: 1.25
+    cached_prompt: 0.125
+    completion: 10.0
+
+  gpt-5-codex:
+    prompt: 1.25
+    cached_prompt: 0.125
+    completion: 10.0
+
+  gpt-5-pro:
+    prompt: 15.0
+    completion: 120.0
+
+  gpt-4.1:
+    prompt: 2.0
+    cached_prompt: 0.5
+    completion: 8.0
+
+  gpt-4.1-mini:
+    prompt: 0.4
+    cached_prompt: 0.1
+    completion: 1.6
+
+  gpt-4.1-nano:
+    prompt: 0.1
+    cached_prompt: 0.025
+    completion: 0.4
+
+  gpt-4o:
+    prompt: 2.5
+    cached_prompt: 1.25
+    completion: 10.0
+
+  gpt-4o-2024-05-13:
+    prompt: 5.0
+    completion: 15.0
+
+  gpt-4o-mini:
+    prompt: 0.15
+    cached_prompt: 0.075
+    completion: 0.6
+
+  gpt-realtime:
+    prompt: 4
+    cached_prompt: 0.4
+    completion: 16
+
+  gpt-realtime-mini:
+    prompt: 0.6
+    cached_prompt: 0.06
+    completion: 2.4
+
+  # gpt-4o-realtime-preview	$5.00	$2.50	$20.00
+  gpt-4o-realtime-preview:
+    prompt: 5.0
+    cached_prompt: 2.5
+    completion: 20.0
+
+  # gpt-4o-mini-realtime-preview	$0.60	$0.30	$2.40
+  gpt-4o-mini-realtime-preview:
+    prompt: 0.6
+    cached_prompt: 0.3
+    completion: 2.4
+
+  # gpt-audio	$2.50	-	$10.00
+  gpt-audio:
+    prompt: 2.5
+    completion: 10.0
+  
+  # gpt-audio-mini	$0.60	-	$2.40
+  gpt-audio-mini:
+    prompt: 0.6
+    completion: 2.4
+
+  # gpt-4o-audio-preview	$2.50	-	$10.00
+  gpt-4o-audio-preview:
+    prompt: 2.5
+    completion: 10.0
+  
+  # gpt-4o-mini-audio-preview	$0.15	-	$0.60
+  gpt-4o-mini-audio-preview:
+    prompt: 0.15
+    completion: 0.6
+
+  o1:
+    prompt: 15.0
+    cached_prompt: 7.5
+    completion: 60.0
+
+  o1-pro:
+    prompt: 150.0
+    completion: 600.0
+
+  o3-pro:
+    prompt: 20.0
+    completion: 80.0
+
+  o3:
+    prompt: 2.0
+    cached_prompt: 0.5
+    completion: 8.0
+
+  o3-deep-research:
+    prompt: 10.0
+    cached_prompt: 2.5
+    completion: 40.0
+
+  o4-mini:
+    prompt: 1.1
+    cached_prompt: 0.275
+    completion: 4.4
+
+  o4-mini-deep-research:
+    prompt: 2.0
+    cached_prompt: 0.5
+    completion: 8.0
+
+  o3-mini:
+    prompt: 1.1
+    cached_prompt: 0.55
+    completion: 4.4
+
+  o1-mini:
+    prompt: 1.1
+    cached_prompt: 0.55
+    completion: 4.4
+
+# codex-mini-latest	$1.50	$0.375	$6.00
+  codex-mini-latest:
+    prompt: 1.5
+    cached_prompt: 0.375
+    completion: 6.0
+
+# gpt-4o-mini-search-preview	$0.15	-	$0.60
+  gpt-4o-mini-search-preview:
+    prompt: 0.15
+    completion: 0.6
+
+# gpt-4o-search-preview	$2.50	-	$10.00
+  gpt-4o-search-preview:
+    prompt: 2.5
+    completion: 10.0
+
+# computer-use-preview	$3.00	-	$12.00
+  computer-use-preview:
+    prompt: 3.0
+    completion: 12.0    
+
+# gpt-image-1	$5.00	$1.25	-
+  gpt-image-1:
+    prompt: 5.0
+    cached_prompt: 1.25
+
+# gpt-image-1-mini	$2.00	$0.20	-
+  gpt-image-1-mini:
+    prompt: 2.0
+    cached_prompt: 0.2 
 
 # Default pricing for unknown models (optional)
 default:
-  prompt: 0.01
-  completion: 0.02
-  
-# Cached token discount (percentage of original cost)
-cached_token_discount: 0.1  # 90% discount = 10% of original cost
+  prompt: 10.0
+  completion: 20.0

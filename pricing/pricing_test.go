@@ -13,29 +13,25 @@ func setupTestConfig() {
 	testConfig := &PricingConfig{
 		Models: map[string]ModelPricing{
 			"gpt-4": {
-				Prompt:     0.03,
-				Completion: 0.06,
-				Aliases:    []string{"gpt-4-0613"},
+				Prompt:     30.0,
+				Completion: 60.0,
 			},
 			"gpt-4o": {
-				Prompt:     0.005,
-				Completion: 0.015,
-				Aliases:    []string{"gpt-4o-2024-08-06"},
+				Prompt:     5.0,
+				Completion: 15.0,
 			},
 			"gpt-5-mini": {
-				Prompt:     0.003,
-				Completion: 0.006,
-				Aliases:    []string{"gpt-5-mini-2025-08-07"},
+				Prompt:     3.0,
+				Completion: 6.0,
 			},
 			"gpt-5": {
-				Prompt:     0.01,
-				Completion: 0.02,
-				Aliases:    []string{"gpt-5-2025-08-07"},
+				Prompt:     10.0,
+				Completion: 20.0,
 			},
 		},
 		Default: &ModelPricing{
-			Prompt:     0.01,
-			Completion: 0.02,
+			Prompt:     10.0,
+			Completion: 20.0,
 		},
 		CachedTokenDiscount: 0.1,
 	}
@@ -51,11 +47,11 @@ func TestComputePrice_GPT5MiniSampleUsage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if res.Model != ModelGPT5Mini {
+	if res.Model != Model("gpt-5-mini") {
 		t.Fatalf("expected model normalize to gpt-5-mini, got %s", res.Model)
 	}
-	expectedPrompt := 11.0 / 1000.0 * 0.003      // 0.000033
-	expectedCompletion := 369.0 / 1000.0 * 0.006 // 0.002214
+	expectedPrompt := 11.0 / 1000000.0 * 3.0      // 0.000033
+	expectedCompletion := 369.0 / 1000000.0 * 6.0 // 0.002214
 	if !almostEqual(res.PromptCostUSD, expectedPrompt) {
 		t.Fatalf("prompt cost mismatch: got %f want %f", res.PromptCostUSD, expectedPrompt)
 	}
@@ -78,7 +74,7 @@ func TestComputePrice_WithCachedPromptTokens(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	billedPrompt := float64(100-60) + 0.1*60 // 40 + 6 = 46 effective tokens
-	expectedPromptCost := (billedPrompt / 1000.0) * 0.003
+	expectedPromptCost := (billedPrompt / 1000000.0) * 3.0
 	if !almostEqual(res.PromptCostUSD, expectedPromptCost) {
 		t.Fatalf("prompt cost mismatch with cache: got %f want %f", res.PromptCostUSD, expectedPromptCost)
 	}
@@ -100,8 +96,8 @@ func TestComputePrice_UnknownModel(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	// Should use default pricing from config
-	expectedPromptCost := (100.0 / 1000.0) * 0.01     // default prompt rate
-	expectedCompletionCost := (200.0 / 1000.0) * 0.02 // default completion rate
+	expectedPromptCost := (100.0 / 1000000.0) * 10.0     // default prompt rate
+	expectedCompletionCost := (200.0 / 1000000.0) * 20.0 // default completion rate
 	if !almostEqual(res.PromptCostUSD, expectedPromptCost) {
 		t.Fatalf("expected default prompt pricing, got %f want %f", res.PromptCostUSD, expectedPromptCost)
 	}
@@ -110,15 +106,33 @@ func TestComputePrice_UnknownModel(t *testing.T) {
 	}
 }
 
-func TestNormalizeModelVariants(t *testing.T) {
-	cases := map[string]Model{
-		"gpt-4o-2024-08-06": ModelGPT4o,
-		"gpt-4-0613":        ModelGPT4,
+func TestResolveModelNamePrefixMatching(t *testing.T) {
+	setupTestConfig()
+	defer ResetConfig()
+
+	cases := map[string]string{
+		// Exact matches
+		"gpt-4o":     "gpt-4o",
+		"gpt-4":      "gpt-4",
+		"gpt-5-mini": "gpt-5-mini",
+
+		// Prefix matches - should match the configured model name
+		"gpt-4o-2024-08-06":     "gpt-4o",
+		"gpt-4-0613":            "gpt-4",
+		"gpt-5-mini-2025-08-07": "gpt-5-mini",
+		"gpt-4-turbo":           "gpt-4",
+
+		// Should prefer longer matches
+		"gpt-5-mini-experimental": "gpt-5-mini", // not just "gpt-5"
+
+		// No match
+		"unknown-model": "unknown-model", // should return as-is
+		"claude-3":      "claude-3",      // should return as-is
 	}
 	for raw, want := range cases {
-		got := NormalizeModel(raw)
+		got := resolveModelName(raw)
 		if got != want {
-			t.Fatalf("NormalizeModel(%q) -> %q want %q", raw, got, want)
+			t.Fatalf("resolveModelName(%q) -> %q want %q", raw, got, want)
 		}
 	}
 }
@@ -146,9 +160,109 @@ func TestComputePrice_CachedExceedsPromptClamp(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	// Cached clamped to 10 -> billed = (10-10) + 0.1*10 = 1
-	expected := (1.0 / 1000.0) * 0.005
+	expected := (1.0 / 1000000.0) * 5.0
 	if !almostEqual(res.PromptCostUSD, expected) {
 		t.Fatalf("expected clamped cached pricing got %f want %f", res.PromptCostUSD, expected)
+	}
+}
+
+func TestComputePrice_UnknownModelNoDefault(t *testing.T) {
+	// Test config with no default pricing
+	configWithoutDefault := &PricingConfig{
+		Models: map[string]ModelPricing{
+			"gpt-4": {
+				Prompt:     30.0,
+				Completion: 60.0,
+			},
+		},
+		// No Default field set
+		CachedTokenDiscount: 0.1,
+	}
+	SetConfig(configWithoutDefault)
+	defer ResetConfig()
+
+	usage := Usage{PromptTokens: 100, CompletionTokens: 200}
+	res, err := ComputePrice("unknown-model", usage)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should return zero costs with unknown pricing note
+	if res.PromptCostUSD != 0.0 || res.CompletionCostUSD != 0.0 || res.TotalCostUSD != 0.0 {
+		t.Fatalf("expected zero costs for unknown model with no default, got %+v", res)
+	}
+	if res.Note != "unknown model pricing" {
+		t.Fatalf("expected 'unknown model pricing' note, got %q", res.Note)
+	}
+	if res.Model != Model("unknown-model") {
+		t.Fatalf("expected model name to be preserved, got %q", res.Model)
+	}
+	// Token counts should still be preserved
+	if res.PromptTokens != 100 || res.CompletionTokens != 200 {
+		t.Fatalf("token counts should be preserved, got prompt=%d completion=%d", res.PromptTokens, res.CompletionTokens)
+	}
+}
+
+func TestPrefixMatchingRealWorld(t *testing.T) {
+	// Test with models similar to the updated pricing.yaml
+	realWorldConfig := &PricingConfig{
+		Models: map[string]ModelPricing{
+			"gpt-4o": {
+				Prompt:     2.5,
+				Completion: 10.0,
+			},
+			"gpt-4o-mini": {
+				Prompt:     0.15,
+				Completion: 0.6,
+			},
+			"o1": {
+				Prompt:     15.0,
+				Completion: 60.0,
+			},
+			"o1-mini": {
+				Prompt:     1.1,
+				Completion: 4.4,
+			},
+		},
+		Default: &ModelPricing{
+			Prompt:     10.0,
+			Completion: 20.0,
+		},
+		CachedTokenDiscount: 0.1,
+	}
+
+	SetConfig(realWorldConfig)
+	defer ResetConfig()
+
+	// Test that longer specific names get matched correctly
+	cases := []struct {
+		input    string
+		expected string
+		prompt   float64
+	}{
+		{"gpt-4o-2024-05-13", "gpt-4o", 2.5},
+		{"gpt-4o-mini-2024-07-18", "gpt-4o-mini", 0.15}, // Should match gpt-4o-mini, not gpt-4o
+		{"o1-preview", "o1", 15.0},
+		{"o1-mini-2024-09-12", "o1-mini", 1.1}, // Should match o1-mini, not o1
+	}
+
+	for _, tc := range cases {
+		resolved := resolveModelName(tc.input)
+		if resolved != tc.expected {
+			t.Fatalf("resolveModelName(%q) -> %q, want %q", tc.input, resolved, tc.expected)
+		}
+
+		// Test actual pricing calculation
+		usage := Usage{PromptTokens: 1000, CompletionTokens: 0}
+		res, err := ComputePrice(tc.input, usage)
+		if err != nil {
+			t.Fatalf("ComputePrice(%q) failed: %v", tc.input, err)
+		}
+
+		expectedCost := tc.prompt / 1000.0 // 1000 tokens * rate / 1million
+		if !almostEqual(res.PromptCostUSD, expectedCost) {
+			t.Fatalf("ComputePrice(%q) prompt cost: got %f, want %f", tc.input, res.PromptCostUSD, expectedCost)
+		}
 	}
 }
 

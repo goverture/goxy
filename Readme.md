@@ -5,8 +5,21 @@ Lightweight **OpenAI API proxy** with **spending limits**. Drop it in front of y
 ## Features
 
 - [x] Hourly spending limit (once exceeded the proxy will return 429)
-- [ ] Admin port (view/update limit and usage)
+- [x] Admin port (view/update limit and usage)
 - [ ] Support for streaming requests (currently only synchronous requests are supported)
+
+## Supported endpoints
+
+- [ ] Only chat/completions for now
+
+## Supported models
+
+- [x] "current" text models from https://platform.openai.com/docs/pricing#text-tokens
+- [ ] "legacy" text models from https://platform.openai.com/docs/pricing#legacy-models
+
+## TODOs
+
+- [ ] Don't use float64 for pricing computation (not precise)
 
 ## 🚀 Install
 

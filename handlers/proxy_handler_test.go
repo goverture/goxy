@@ -19,14 +19,13 @@ func setupTestPricingConfig() {
 	testConfig := &pricing.PricingConfig{
 		Models: map[string]pricing.ModelPricing{
 			"gpt-4o": {
-				Prompt:     0.005,
-				Completion: 0.015,
-				Aliases:    []string{"gpt-4o-2024-08-06"},
+				Prompt:     5.0,
+				Completion: 15.0,
 			},
 		},
 		Default: &pricing.ModelPricing{
-			Prompt:     0.01,
-			Completion: 0.02,
+			Prompt:     10.0,
+			Completion: 20.0,
 		},
 		CachedTokenDiscount: 0.1,
 	}
@@ -148,7 +147,7 @@ func TestProxy_SpendLimitExceeded(t *testing.T) {
 	// Upstream server that returns pricing-eligible JSON (model + usage)
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		// Cost per request (prompt tokens 200 @ gpt-4o prompt $0.005/1K) => 0.2 * 0.005 = $0.001
+		// Cost per request (prompt tokens 200 @ gpt-4o prompt $5.0/1M) => 200 * 5.0/1M = $0.001
 		w.Write([]byte(`{"model":"gpt-4o","usage":{"prompt_tokens":200,"completion_tokens":0}}`))
 	}))
 	defer upstream.Close()
@@ -221,8 +220,8 @@ func TestProxy_UnauthenticatedRequestsBypassLimits(t *testing.T) {
 	defer upstream.Close()
 
 	// Very low spend limit that would normally block requests
-	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL, SpendLimitPerHour: 0.001}
-	mgr := limit.NewManager(0.001)
+	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL, SpendLimitPerHour: 0.000001}
+	mgr := limit.NewManager(0.000001)
 	h := NewProxyHandler(mgr)
 
 	doUnauthenticatedReq := func() *httptest.ResponseRecorder {

@@ -28,6 +28,18 @@ type PriceResult struct {
 	Note              string
 }
 
+// PriceResultMoney holds the computed pricing info using Money type for precision.
+type PriceResultMoney struct {
+	Model            Model
+	ServiceTier      string
+	PromptTokens     int
+	CompletionTokens int
+	PromptCost       Money
+	CompletionCost   Money
+	TotalCost        Money
+	Note             string
+}
+
 // getPricing returns the pricing for a given model and service tier from configuration
 func getPricing(model Model, serviceTier string) (struct{ Prompt, CachedPrompt, Completion float64 }, string, error) {
 	cfg, err := GetConfig()
@@ -143,7 +155,7 @@ func ComputePriceWithTier(modelRaw string, u Usage, serviceTier string) (PriceRe
 		note += fmt.Sprintf(" (using %s tier pricing)", actualTier)
 	}
 	if u.PromptCachedTokens > 0 {
-		note += fmt.Sprintf(" (includes cached prompt token pricing)")
+		note += " (includes cached prompt token pricing)"
 	}
 
 	return PriceResult{
@@ -160,4 +172,113 @@ func ComputePriceWithTier(modelRaw string, u Usage, serviceTier string) (PriceRe
 
 func (pr PriceResult) String() string {
 	return fmt.Sprintf("[pricing] model=%s tier=%s prompt=%d completion=%d cost_prompt=$%.6f cost_completion=$%.6f total=$%.6f", pr.Model, pr.ServiceTier, pr.PromptTokens, pr.CompletionTokens, pr.PromptCostUSD, pr.CompletionCostUSD, pr.TotalCostUSD)
+}
+
+// getPricingMoney returns the Money-based pricing for a given model and service tier from configuration
+func getPricingMoney(model Model, serviceTier string) (prompt, cachedPrompt, completion Money, actualTier string, err error) {
+	cfg, configErr := GetConfig()
+	if configErr != nil {
+		return Money(0), Money(0), Money(0), "standard", fmt.Errorf("failed to load pricing config: %w", configErr)
+	}
+
+	cfgMoney := cfg.ToMoney()
+	pricing, found := cfgMoney.FindModelPricingMoney(string(model))
+	if found {
+		prompt, cachedPrompt, completion, actualTier := pricing.GetTierPricingMoney(serviceTier)
+		return prompt, cachedPrompt, completion, actualTier, nil
+	}
+
+	// Fallback to default if configured
+	if cfgMoney.Default != nil {
+		prompt, cachedPrompt, completion, _ := cfgMoney.Default.GetTierPricingMoney(serviceTier)
+		return prompt, cachedPrompt, completion, "standard", nil
+	}
+
+	return Money(0), Money(0), Money(0), "standard", fmt.Errorf("no pricing found for model %s", model)
+}
+
+// ComputePriceMoney calculates cost given usage and model (using standard pricing) with Money precision.
+func ComputePriceMoney(modelRaw string, u Usage) (PriceResultMoney, error) {
+	return ComputePriceMoneyWithTier(modelRaw, u, "standard")
+}
+
+// ComputePriceMoneyWithTier calculates cost given usage, model, and service tier using Money precision.
+func ComputePriceMoneyWithTier(modelRaw string, u Usage, serviceTier string) (PriceResultMoney, error) {
+	modelName := resolveModelName(modelRaw)
+	m := Model(modelName)
+	promptPrice, cachedPromptPrice, completionPrice, actualTier, err := getPricingMoney(m, serviceTier)
+	if err != nil {
+		return PriceResultMoney{
+			Model:            m,
+			ServiceTier:      serviceTier,
+			PromptTokens:     u.PromptTokens,
+			CompletionTokens: u.CompletionTokens,
+			Note:             "unknown model pricing",
+		}, nil
+	}
+
+	// Log tier fallback if different from requested
+	if serviceTier != "standard" && actualTier != serviceTier {
+		fmt.Printf("[pricing] Service tier fallback: %q -> %q for model %q\n", serviceTier, actualTier, modelName)
+	}
+
+	// Calculate prompt cost: split between cached and non-cached tokens
+	var ptCost Money
+	if u.PromptCachedTokens > 0 {
+		cached := u.PromptCachedTokens
+		if cached > u.PromptTokens {
+			cached = u.PromptTokens
+		}
+		nonCachedTokens := u.PromptTokens - cached
+
+		// Use precise Money arithmetic
+		nonCachedCost := promptPrice.Multiply(float64(nonCachedTokens) / 1000000.0)
+		cachedCost := cachedPromptPrice.Multiply(float64(cached) / 1000000.0)
+		ptCost = nonCachedCost.Add(cachedCost)
+	} else {
+		// All prompt tokens are regular (non-cached)
+		ptCost = promptPrice.Multiply(float64(u.PromptTokens) / 1000000.0)
+	}
+
+	ctCost := completionPrice.Multiply(float64(u.CompletionTokens) / 1000000.0)
+	total := ptCost.Add(ctCost)
+
+	note := "prices loaded from config; verify against https://openai.com/api/pricing/"
+	if actualTier != "standard" {
+		note += fmt.Sprintf(" (using %s tier pricing)", actualTier)
+	}
+	if u.PromptCachedTokens > 0 {
+		note += " (includes cached prompt token pricing)"
+	}
+
+	return PriceResultMoney{
+		Model:            m,
+		ServiceTier:      actualTier,
+		PromptTokens:     u.PromptTokens,
+		CompletionTokens: u.CompletionTokens,
+		PromptCost:       ptCost,
+		CompletionCost:   ctCost,
+		TotalCost:        total,
+		Note:             note,
+	}, nil
+}
+
+// ToLegacy converts PriceResultMoney to PriceResult for backward compatibility
+func (pr PriceResultMoney) ToLegacy() PriceResult {
+	return PriceResult{
+		Model:             pr.Model,
+		ServiceTier:       pr.ServiceTier,
+		PromptTokens:      pr.PromptTokens,
+		CompletionTokens:  pr.CompletionTokens,
+		PromptCostUSD:     pr.PromptCost.ToUSD(),
+		CompletionCostUSD: pr.CompletionCost.ToUSD(),
+		TotalCostUSD:      pr.TotalCost.ToUSD(),
+		Note:              pr.Note,
+	}
+}
+
+func (pr PriceResultMoney) String() string {
+	return fmt.Sprintf("[pricing] model=%s tier=%s prompt=%d completion=%d cost_prompt=%s cost_completion=%s total=%s",
+		pr.Model, pr.ServiceTier, pr.PromptTokens, pr.CompletionTokens,
+		pr.PromptCost.String(), pr.CompletionCost.String(), pr.TotalCost.String())
 }

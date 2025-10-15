@@ -1,0 +1,59 @@
+package pricing
+
+import (
+	"fmt"
+	"math"
+)
+
+// MonetaryUnit defines the precision for monetary calculations.
+// Using micro cents (1/100,000,000 USD) provides 8 decimal places of precision.
+// This constant can be easily changed to adjust precision.
+const MonetaryUnit = 100_000_000 // 1 USD = 100,000,000 micro cents
+
+// Money represents a monetary amount in micro cents (integer-based for precision)
+type Money int64
+
+// NewMoneyFromUSD creates a Money value from USD (float64)
+func NewMoneyFromUSD(usd float64) Money {
+	return Money(math.Round(usd * MonetaryUnit))
+}
+
+// ToUSD converts Money to USD (float64) for display/API compatibility
+func (m Money) ToUSD() float64 {
+	return float64(m) / MonetaryUnit
+}
+
+// Add adds two Money values
+func (m Money) Add(other Money) Money {
+	return m + other
+}
+
+// Multiply multiplies Money by a scalar (for token calculations)
+func (m Money) Multiply(factor float64) Money {
+	return Money(math.Round(float64(m) * factor))
+}
+
+// String returns the Money as a formatted USD string
+func (m Money) String() string {
+	return fmt.Sprintf("$%.8f", m.ToUSD())
+}
+
+// IsZero returns true if the money amount is zero
+func (m Money) IsZero() bool {
+	return m == 0
+}
+
+// IsNegative returns true if the money amount is negative
+func (m Money) IsNegative() bool {
+	return m < 0
+}
+
+// LessThan returns true if this money amount is less than the other
+func (m Money) LessThan(other Money) bool {
+	return m < other
+}
+
+// GreaterThan returns true if this money amount is greater than the other
+func (m Money) GreaterThan(other Money) bool {
+	return m > other
+}

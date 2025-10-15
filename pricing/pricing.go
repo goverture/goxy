@@ -156,9 +156,5 @@ func ComputePriceWithTier(modelRaw string, u Usage, serviceTier string) (PriceRe
 }
 
 func (pr PriceResult) String() string {
-	tierInfo := ""
-	if pr.ServiceTier != "standard" {
-		tierInfo = fmt.Sprintf(" tier=%s", pr.ServiceTier)
-	}
-	return fmt.Sprintf("[pricing] model=%s%s prompt=%d completion=%d cost_prompt=$%.6f cost_completion=$%.6f total=$%.6f", pr.Model, tierInfo, pr.PromptTokens, pr.CompletionTokens, pr.PromptCostUSD, pr.CompletionCostUSD, pr.TotalCostUSD)
+	return fmt.Sprintf("[pricing] model=%s tier=%s prompt=%d completion=%d cost_prompt=$%.6f cost_completion=$%.6f total=$%.6f", pr.Model, pr.ServiceTier, pr.PromptTokens, pr.CompletionTokens, pr.PromptCostUSD, pr.CompletionCostUSD, pr.TotalCostUSD)
 }

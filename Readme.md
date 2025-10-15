@@ -11,7 +11,8 @@ Lightweight **OpenAI API proxy** with **spending limits**. Drop it in front of y
 
 ## Supported endpoints
 
-- [ ] Only chat/completions for now
+- [x] v1/chat/completions
+- [x] v1/responses
 
 ## Supported models
 

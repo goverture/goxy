@@ -10,11 +10,20 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ModelPricing represents pricing for a single model
+// TierPricing represents pricing for a specific service tier
+type TierPricing struct {
+	Prompt     float64 `yaml:"prompt"`
+	Completion float64 `yaml:"completion"`
+}
+
+// ModelPricing represents pricing for a single model with different service tiers
 type ModelPricing struct {
-	Prompt     float64  `yaml:"prompt"`
-	Completion float64  `yaml:"completion"`
-	Aliases    []string `yaml:"aliases,omitempty"`
+	Prompt     float64      `yaml:"prompt"`
+	Completion float64      `yaml:"completion"`
+	Flex       *TierPricing `yaml:"flex,omitempty"`
+	Priority   *TierPricing `yaml:"priority,omitempty"`
+	Batch      *TierPricing `yaml:"batch,omitempty"`
+	Aliases    []string     `yaml:"aliases,omitempty"`
 }
 
 // PricingConfig represents the entire pricing configuration
@@ -121,4 +130,24 @@ func (cfg *PricingConfig) FindModelPricing(modelName string) (*ModelPricing, boo
 	}
 
 	return nil, false
+}
+
+// GetTierPricing returns pricing for a specific service tier, falling back to standard if tier not available
+func (mp *ModelPricing) GetTierPricing(serviceTier string) (prompt, completion float64, tier string) {
+	switch serviceTier {
+	case "flex":
+		if mp.Flex != nil {
+			return mp.Flex.Prompt, mp.Flex.Completion, "flex"
+		}
+	case "priority":
+		if mp.Priority != nil {
+			return mp.Priority.Prompt, mp.Priority.Completion, "priority"
+		}
+	case "batch":
+		if mp.Batch != nil {
+			return mp.Batch.Prompt, mp.Batch.Completion, "batch"
+		}
+	}
+	// Fallback to standard pricing
+	return mp.Prompt, mp.Completion, "standard"
 }

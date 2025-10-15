@@ -19,6 +19,7 @@ type Usage struct {
 // PriceResult holds the computed pricing info.
 type PriceResult struct {
 	Model             Model
+	ServiceTier       string
 	PromptTokens      int
 	CompletionTokens  int
 	PromptCostUSD     float64
@@ -27,19 +28,20 @@ type PriceResult struct {
 	Note              string
 }
 
-// getPricing returns the pricing for a given model from configuration
-func getPricing(model Model) (struct{ Prompt, Completion float64 }, error) {
+// getPricing returns the pricing for a given model and service tier from configuration
+func getPricing(model Model, serviceTier string) (struct{ Prompt, Completion float64 }, string, error) {
 	cfg, err := GetConfig()
 	if err != nil {
-		return struct{ Prompt, Completion float64 }{}, fmt.Errorf("failed to load pricing config: %w", err)
+		return struct{ Prompt, Completion float64 }{}, "standard", fmt.Errorf("failed to load pricing config: %w", err)
 	}
 
 	pricing, found := cfg.FindModelPricing(string(model))
 	if found {
+		prompt, completion, actualTier := pricing.GetTierPricing(serviceTier)
 		return struct{ Prompt, Completion float64 }{
-			Prompt:     pricing.Prompt,
-			Completion: pricing.Completion,
-		}, nil
+			Prompt:     prompt,
+			Completion: completion,
+		}, actualTier, nil
 	}
 
 	// Fallback to default if configured
@@ -47,10 +49,10 @@ func getPricing(model Model) (struct{ Prompt, Completion float64 }, error) {
 		return struct{ Prompt, Completion float64 }{
 			Prompt:     cfg.Default.Prompt,
 			Completion: cfg.Default.Completion,
-		}, nil
+		}, "standard", nil
 	}
 
-	return struct{ Prompt, Completion float64 }{}, fmt.Errorf("no pricing found for model %s", model)
+	return struct{ Prompt, Completion float64 }{}, "standard", fmt.Errorf("no pricing found for model %s", model)
 }
 
 // resolveModelName determines the canonical model name to use for pricing lookup.
@@ -88,13 +90,29 @@ func resolveModelName(raw string) string {
 	return raw
 }
 
-// ComputePrice calculates cost given usage and model.
+// ComputePrice calculates cost given usage and model (using standard pricing).
 func ComputePrice(modelRaw string, u Usage) (PriceResult, error) {
+	return ComputePriceWithTier(modelRaw, u, "standard")
+}
+
+// ComputePriceWithTier calculates cost given usage, model, and service tier.
+func ComputePriceWithTier(modelRaw string, u Usage, serviceTier string) (PriceResult, error) {
 	modelName := resolveModelName(modelRaw)
 	m := Model(modelName)
-	tiers, err := getPricing(m)
+	tiers, actualTier, err := getPricing(m, serviceTier)
 	if err != nil {
-		return PriceResult{Model: m, PromptTokens: u.PromptTokens, CompletionTokens: u.CompletionTokens, Note: "unknown model pricing"}, nil
+		return PriceResult{
+			Model:            m,
+			ServiceTier:      serviceTier,
+			PromptTokens:     u.PromptTokens,
+			CompletionTokens: u.CompletionTokens,
+			Note:             "unknown model pricing",
+		}, nil
+	}
+
+	// Log tier fallback if different from requested
+	if serviceTier != "standard" && actualTier != serviceTier {
+		fmt.Printf("[pricing] Service tier fallback: %q -> %q for model %q\n", serviceTier, actualTier, modelName)
 	}
 
 	// Get cached token discount from config
@@ -118,12 +136,16 @@ func ComputePrice(modelRaw string, u Usage) (PriceResult, error) {
 	ctCost := (float64(u.CompletionTokens) / 1000000.0) * tiers.Completion
 	total := ptCost + ctCost
 	note := "prices loaded from config; verify against https://openai.com/api/pricing/"
+	if actualTier != "standard" {
+		note += fmt.Sprintf(" (using %s tier pricing)", actualTier)
+	}
 	if u.PromptCachedTokens > 0 {
 		discountPercent := int((1.0 - cachedDiscount) * 100)
 		note += fmt.Sprintf(" (includes %d%% discount for cached prompt tokens)", discountPercent)
 	}
 	return PriceResult{
 		Model:             m,
+		ServiceTier:       actualTier,
 		PromptTokens:      u.PromptTokens,
 		CompletionTokens:  u.CompletionTokens,
 		PromptCostUSD:     ptCost,
@@ -134,5 +156,9 @@ func ComputePrice(modelRaw string, u Usage) (PriceResult, error) {
 }
 
 func (pr PriceResult) String() string {
-	return fmt.Sprintf("[pricing] model=%s prompt=%d completion=%d cost_prompt=$%.6f cost_completion=$%.6f total=$%.6f", pr.Model, pr.PromptTokens, pr.CompletionTokens, pr.PromptCostUSD, pr.CompletionCostUSD, pr.TotalCostUSD)
+	tierInfo := ""
+	if pr.ServiceTier != "standard" {
+		tierInfo = fmt.Sprintf(" tier=%s", pr.ServiceTier)
+	}
+	return fmt.Sprintf("[pricing] model=%s%s prompt=%d completion=%d cost_prompt=$%.6f cost_completion=$%.6f total=$%.6f", pr.Model, tierInfo, pr.PromptTokens, pr.CompletionTokens, pr.PromptCostUSD, pr.CompletionCostUSD, pr.TotalCostUSD)
 }

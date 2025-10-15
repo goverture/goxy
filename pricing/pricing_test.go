@@ -299,3 +299,111 @@ func TestLoadConfigFromYAML(t *testing.T) {
 		t.Fatalf("unexpected pricing values: %+v", pricing)
 	}
 }
+
+func TestComputePriceWithTier(t *testing.T) {
+	// Setup a test configuration with service tiers
+	testConfig := &PricingConfig{
+		Models: map[string]ModelPricing{
+			"gpt-5": {
+				Prompt:     1.25,
+				Completion: 10.0,
+				Flex: &TierPricing{
+					Prompt:     0.625,
+					Completion: 5.0,
+				},
+				Priority: &TierPricing{
+					Prompt:     2.5,
+					Completion: 20.0,
+				},
+			},
+			"gpt-4o": {
+				Prompt:     2.5,
+				Completion: 10.0,
+				// No flex or priority tiers
+			},
+		},
+		CachedTokenDiscount: 0.1,
+	}
+	SetConfig(testConfig)
+	defer ResetConfig()
+
+	usage := Usage{PromptTokens: 1000, CompletionTokens: 500}
+
+	// Test standard pricing
+	res, err := ComputePriceWithTier("gpt-5", usage, "standard")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.ServiceTier != "standard" {
+		t.Errorf("expected service tier 'standard', got '%s'", res.ServiceTier)
+	}
+	expectedPromptCost := (1000.0 / 1000000.0) * 1.25
+	expectedCompletionCost := (500.0 / 1000000.0) * 10.0
+	if !almostEqual(res.PromptCostUSD, expectedPromptCost) {
+		t.Errorf("expected prompt cost %f, got %f", expectedPromptCost, res.PromptCostUSD)
+	}
+	if !almostEqual(res.CompletionCostUSD, expectedCompletionCost) {
+		t.Errorf("expected completion cost %f, got %f", expectedCompletionCost, res.CompletionCostUSD)
+	}
+
+	// Test flex pricing
+	res, err = ComputePriceWithTier("gpt-5", usage, "flex")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.ServiceTier != "flex" {
+		t.Errorf("expected service tier 'flex', got '%s'", res.ServiceTier)
+	}
+	expectedPromptCost = (1000.0 / 1000000.0) * 0.625
+	expectedCompletionCost = (500.0 / 1000000.0) * 5.0
+	if !almostEqual(res.PromptCostUSD, expectedPromptCost) {
+		t.Errorf("expected flex prompt cost %f, got %f", expectedPromptCost, res.PromptCostUSD)
+	}
+	if !almostEqual(res.CompletionCostUSD, expectedCompletionCost) {
+		t.Errorf("expected flex completion cost %f, got %f", expectedCompletionCost, res.CompletionCostUSD)
+	}
+
+	// Test priority pricing
+	res, err = ComputePriceWithTier("gpt-5", usage, "priority")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.ServiceTier != "priority" {
+		t.Errorf("expected service tier 'priority', got '%s'", res.ServiceTier)
+	}
+	expectedPromptCost = (1000.0 / 1000000.0) * 2.5
+	expectedCompletionCost = (500.0 / 1000000.0) * 20.0
+	if !almostEqual(res.PromptCostUSD, expectedPromptCost) {
+		t.Errorf("expected priority prompt cost %f, got %f", expectedPromptCost, res.PromptCostUSD)
+	}
+	if !almostEqual(res.CompletionCostUSD, expectedCompletionCost) {
+		t.Errorf("expected priority completion cost %f, got %f", expectedCompletionCost, res.CompletionCostUSD)
+	}
+
+	// Test fallback to standard when tier not available
+	res, err = ComputePriceWithTier("gpt-4o", usage, "flex")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.ServiceTier != "standard" {
+		t.Errorf("expected fallback to 'standard', got '%s'", res.ServiceTier)
+	}
+	// Should use standard gpt-4o pricing
+	expectedPromptCost = (1000.0 / 1000000.0) * 2.5
+	expectedCompletionCost = (500.0 / 1000000.0) * 10.0
+	if !almostEqual(res.PromptCostUSD, expectedPromptCost) {
+		t.Errorf("expected fallback prompt cost %f, got %f", expectedPromptCost, res.PromptCostUSD)
+	}
+	if !almostEqual(res.CompletionCostUSD, expectedCompletionCost) {
+		t.Errorf("expected fallback completion cost %f, got %f", expectedCompletionCost, res.CompletionCostUSD)
+	}
+
+	// Test that ComputePrice still works (backward compatibility)
+	res, err = ComputePrice("gpt-5", usage)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.ServiceTier != "standard" {
+		t.Errorf("expected ComputePrice to use 'standard' tier, got '%s'", res.ServiceTier)
+	}
+}

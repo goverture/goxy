@@ -22,18 +22,55 @@ func main() {
 		fmt.Println(result.String())
 	}
 
-	// Example 2: Using a custom configuration
-	fmt.Println("\n=== Example 2: Custom Configuration ===")
+	// Example 2: Service Tier Pricing
+	fmt.Println("\n=== Example 2: Service Tier Pricing ===")
+	models := []string{"gpt-5", "gpt-4o", "o3"}
+	tiers := []string{"standard", "flex", "priority"}
+
+	for _, model := range models {
+		fmt.Printf("\nModel: %s\n", model)
+		fmt.Println("---------------")
+
+		for _, tier := range tiers {
+			result, err := pricing.ComputePriceWithTier(model, usage, tier)
+			if err != nil {
+				log.Printf("Error computing price for %s with tier %s: %v", model, tier, err)
+				continue
+			}
+
+			tierInfo := result.ServiceTier
+			if tierInfo != tier {
+				tierInfo = fmt.Sprintf("%s (fallback from %s)", result.ServiceTier, tier)
+			}
+
+			fmt.Printf("  %s: $%.6f\n", tierInfo, result.TotalCostUSD)
+		}
+	}
+
+	// Example 3: Cached Token Pricing with Service Tiers
+	fmt.Println("\n=== Example 3: Cached Token Pricing ===")
+	usageWithCached := pricing.Usage{
+		PromptTokens:       1000,
+		PromptCachedTokens: 200, // 200 tokens from cache
+		CompletionTokens:   500,
+	}
+
+	for _, tier := range []string{"standard", "flex", "priority"} {
+		result, err := pricing.ComputePriceWithTier("gpt-5", usageWithCached, tier)
+		if err != nil {
+			log.Printf("Error: %v", err)
+			continue
+		}
+		fmt.Printf("gpt-5 %s with cached tokens: $%.6f\n", result.ServiceTier, result.TotalCostUSD)
+	}
+
+	// Example 4: Using a custom configuration
+	fmt.Println("\n=== Example 4: Custom Configuration ===")
 	customConfig := &pricing.PricingConfig{
 		Models: map[string]pricing.ModelPricing{
 			"custom-model": {
 				Prompt:     0.001,
 				Completion: 0.002,
-			},
-			"gpt-4": {
-				Prompt:     0.035, // Updated pricing
-				Completion: 0.065,
-				Aliases:    []string{"gpt-4-0613", "gpt-4-latest"},
 			},
 		},
 		Default: &pricing.ModelPricing{
@@ -55,7 +92,7 @@ func main() {
 	}
 
 	// Test with cached tokens
-	fmt.Println("\n=== Example 3: With Cached Tokens ===")
+	fmt.Println("\n=== Example 5: With Cached Tokens ===")
 	usageWithCache := pricing.Usage{
 		PromptTokens:       1000,
 		PromptCachedTokens: 600, // 60% of tokens are cached
@@ -70,18 +107,6 @@ func main() {
 		fmt.Printf("Note: %s\n", result3.Note)
 	}
 
-	// Example 4: Loading from a custom YAML file
-	fmt.Println("\n=== Example 4: Loading Custom YAML ===")
-	// Reset to load from file
+	// Reset configuration back to default
 	pricing.ResetConfig()
-
-	// This would load from pricing/pricing.yaml by default
-	// You can also use: pricing.LoadConfig("/path/to/custom/pricing.yaml")
-
-	result4, err := pricing.ComputePrice("gpt-5-mini", usage)
-	if err != nil {
-		log.Printf("Error computing price: %v", err)
-	} else {
-		fmt.Println(result4.String())
-	}
 }

@@ -6,11 +6,12 @@ import (
 )
 
 // MonetaryUnit defines the precision for monetary calculations.
-// Using micro cents (1/100,000,000 USD) provides 8 decimal places of precision.
+// Using nano cents (1/10,000,000,000 USD) provides 10 decimal places of precision.
+// This handles even the smallest possible API costs while maintaining integer precision.
 // This constant can be easily changed to adjust precision.
-const MonetaryUnit = 100_000_000 // 1 USD = 100,000,000 micro cents
+const MonetaryUnit = 10_000_000_000 // 1 USD = 10,000,000,000 nano cents
 
-// Money represents a monetary amount in micro cents (integer-based for precision)
+// Money represents a monetary amount in nano cents (integer-based for precision)
 type Money int64
 
 // NewMoneyFromUSD creates a Money value from USD (float64)

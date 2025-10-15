@@ -54,7 +54,7 @@ func TestProxy_ForwardsMethodPathQueryBodyAndHeaders(t *testing.T) {
 		OpenAIBaseURL: upstream.URL,
 	}
 
-	mgr := pricing.NewManager(2.0) // Default limit for basic tests
+	mgr := pricing.NewLimitManager(2.0) // Default limit for basic tests
 	h := NewProxyHandler(mgr)
 
 	// Build a request that would hit our proxy
@@ -102,7 +102,7 @@ func TestProxy_LogsParsedJSONResponse(t *testing.T) {
 
 	// Configure proxy
 	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL}
-	mgr := pricing.NewManager(2.0) // Default limit for logging tests
+	mgr := pricing.NewLimitManager(2.0) // Default limit for logging tests
 	h := NewProxyHandler(mgr)
 
 	// Capture stdout
@@ -154,7 +154,7 @@ func TestProxy_SpendLimitExceeded(t *testing.T) {
 
 	// Spend limit just above first request cost so second pushes over limit; third should be blocked
 	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL, SpendLimitPerHour: 0.0015}
-	mgr := pricing.NewManager(0.0015)
+	mgr := pricing.NewLimitManager(0.0015)
 	h := NewProxyHandler(mgr)
 
 	doReq := func() *httptest.ResponseRecorder {
@@ -191,7 +191,7 @@ func TestProxy_ZeroLimitBlocksImmediately(t *testing.T) {
 
 	// Zero limit => every non-anonymous key blocked right away
 	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL, SpendLimitPerHour: 0}
-	mgr := pricing.NewManager(0)
+	mgr := pricing.NewLimitManager(0)
 	h := NewProxyHandler(mgr)
 
 	req := httptest.NewRequest(http.MethodGet, "http://proxy.local/v1/test", nil)
@@ -221,7 +221,7 @@ func TestProxy_UnauthenticatedRequestsBypassLimits(t *testing.T) {
 
 	// Very low spend limit that would normally block requests
 	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL, SpendLimitPerHour: 0.000001}
-	mgr := pricing.NewManager(0.000001)
+	mgr := pricing.NewLimitManager(0.000001)
 	h := NewProxyHandler(mgr)
 
 	doUnauthenticatedReq := func() *httptest.ResponseRecorder {

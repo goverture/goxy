@@ -44,15 +44,19 @@ type keyWindowMoney struct {
 }
 
 // NewManager creates a spend limit manager with the given per-hour limit (USD).
-// Pass <=0 to disable limiting.
-func NewManager(limit float64) *Manager { return &Manager{limit: limit} }
+// Now uses Money internally for precision. Pass <=0 to disable limiting.
+func NewManager(limit float64) *Manager {
+	// Keep the old interface but note that ManagerMoney is preferred for new code
+	return &Manager{limit: limit}
+}
 
 // NewManagerMoney creates a spend limit manager with the given per-hour limit (Money).
-// Pass negative value to disable limiting.
+// Pass negative value to disable limiting. This is the preferred constructor.
 func NewManagerMoney(limit Money) *ManagerMoney { return &ManagerMoney{limit: limit} }
 
 // NewManagerMoneyFromUSD creates a spend limit manager with the given per-hour limit converted from USD.
 // Pass <0 to disable limiting, pass 0 for zero allowance.
+// This is the recommended constructor for new code.
 func NewManagerMoneyFromUSD(limitUSD float64) *ManagerMoney {
 	var limit Money
 	if limitUSD < 0 {
@@ -61,6 +65,11 @@ func NewManagerMoneyFromUSD(limitUSD float64) *ManagerMoney {
 		limit = NewMoneyFromUSD(limitUSD)
 	}
 	return &ManagerMoney{limit: limit}
+}
+
+// NewLimitManager is an alias for NewManagerMoneyFromUSD - the preferred way to create limit managers.
+func NewLimitManager(limitUSD float64) *ManagerMoney {
+	return NewManagerMoneyFromUSD(limitUSD)
 }
 
 // Allow checks whether the given key is currently allowed to spend more.

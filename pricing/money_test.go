@@ -12,10 +12,10 @@ func TestMoney_Precision(t *testing.T) {
 		expected Money
 	}{
 		{"Zero", 0.0, Money(0)},
-		{"Simple dollar", 1.0, Money(100_000_000)},
-		{"Small amount", 0.00000001, Money(1)},
-		{"Complex amount", 12.345678, Money(1234567800)},
-		{"Very precise", 0.12345678, Money(12345678)},
+		{"Simple dollar", 1.0, Money(10_000_000_000)},
+		{"Small amount", 0.00000001, Money(100)},
+		{"Complex amount", 12.345678, Money(123_456_780_000)},
+		{"Very precise", 0.12345678, Money(1_234_567_800)},
 	}
 
 	for _, tt := range tests {
@@ -27,7 +27,7 @@ func TestMoney_Precision(t *testing.T) {
 
 			// Test round-trip conversion
 			backToUSD := money.ToUSD()
-			if math.Abs(backToUSD-tt.usd) > 1e-8 {
+			if math.Abs(backToUSD-tt.usd) > 1e-10 {
 				t.Errorf("Round-trip conversion failed: %f -> %d -> %f", tt.usd, money, backToUSD)
 			}
 		})

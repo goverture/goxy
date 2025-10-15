@@ -2,6 +2,8 @@
 
 Lightweight **OpenAI API proxy** with **spending limits**. Drop it in front of your app to control usage & avoid surprise bills.
 
+**PSA: I'm vibing it at the moment, please don't rely on it too much until v1.0 !**
+
 ## Features
 
 - [x] Hourly spending limit (once exceeded the proxy will return 429)

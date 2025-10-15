@@ -25,13 +25,13 @@ type ResponseAPIResponse struct {
 	Billing    struct {
 		Payer string `json:"payer"`
 	} `json:"billing"`
-	Error              interface{} `json:"error"`
-	IncompleteDetails  interface{} `json:"incomplete_details"`
-	Instructions       interface{} `json:"instructions"`
-	MaxOutputTokens    interface{} `json:"max_output_tokens"`
-	MaxToolCalls       interface{} `json:"max_tool_calls"`
-	Model              string      `json:"model"`
-	Output             []struct {
+	Error             interface{} `json:"error"`
+	IncompleteDetails interface{} `json:"incomplete_details"`
+	Instructions      interface{} `json:"instructions"`
+	MaxOutputTokens   interface{} `json:"max_output_tokens"`
+	MaxToolCalls      interface{} `json:"max_tool_calls"`
+	Model             string      `json:"model"`
+	Output            []struct {
 		ID      string `json:"id"`
 		Type    string `json:"type"`
 		Status  string `json:"status"`
@@ -43,10 +43,10 @@ type ResponseAPIResponse struct {
 		} `json:"content"`
 		Role string `json:"role"`
 	} `json:"output"`
-	ParallelToolCalls    bool        `json:"parallel_tool_calls"`
-	PreviousResponseID   interface{} `json:"previous_response_id"`
-	PromptCacheKey       interface{} `json:"prompt_cache_key"`
-	Reasoning            struct {
+	ParallelToolCalls  bool        `json:"parallel_tool_calls"`
+	PreviousResponseID interface{} `json:"previous_response_id"`
+	PromptCacheKey     interface{} `json:"prompt_cache_key"`
+	Reasoning          struct {
 		Effort  interface{} `json:"effort"`
 		Summary interface{} `json:"summary"`
 	} `json:"reasoning"`
@@ -60,17 +60,17 @@ type ResponseAPIResponse struct {
 		} `json:"format"`
 		Verbosity string `json:"verbosity"`
 	} `json:"text"`
-	ToolChoice   string        `json:"tool_choice"`
-	Tools        []interface{} `json:"tools"`
-	TopLogprobs  int           `json:"top_logprobs"`
-	TopP         float64       `json:"top_p"`
-	Truncation   string        `json:"truncation"`
-	Usage        struct {
-		InputTokens int `json:"input_tokens"`
+	ToolChoice  string        `json:"tool_choice"`
+	Tools       []interface{} `json:"tools"`
+	TopLogprobs int           `json:"top_logprobs"`
+	TopP        float64       `json:"top_p"`
+	Truncation  string        `json:"truncation"`
+	Usage       struct {
+		InputTokens        int `json:"input_tokens"`
 		InputTokensDetails struct {
 			CachedTokens int `json:"cached_tokens"`
 		} `json:"input_tokens_details"`
-		OutputTokens int `json:"output_tokens"`
+		OutputTokens        int `json:"output_tokens"`
 		OutputTokensDetails struct {
 			ReasoningTokens int `json:"reasoning_tokens"`
 		} `json:"output_tokens_details"`
@@ -111,11 +111,11 @@ func HandleResponses(w http.ResponseWriter, r *http.Request) {
 
 	// Generate a fake response based on the input
 	responseText := generateResponseContent(req.Input)
-	
+
 	// Create response ID and message ID
 	responseID := fmt.Sprintf("resp_%032x", time.Now().UnixNano())
 	messageID := fmt.Sprintf("msg_%032x", time.Now().UnixNano()+1)
-	
+
 	// Build the response structure
 	response := ResponseAPIResponse{
 		ID:         responseID,
@@ -205,7 +205,7 @@ func HandleResponses(w http.ResponseWriter, r *http.Request) {
 	// Set realistic token usage
 	inputTokens := estimateTokens(req.Input)
 	outputTokens := estimateTokens(responseText)
-	
+
 	response.Usage.InputTokens = inputTokens
 	response.Usage.InputTokensDetails.CachedTokens = 0
 	response.Usage.OutputTokens = outputTokens

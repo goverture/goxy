@@ -41,10 +41,20 @@ goxy -l 1.5
 Then point your app to `http://localhost:8080`.
 
 ```
+# Completion API
 curl -v http://localhost:8080/v1/chat/completions \
   -H "Authorization: Bearer $OPENAI_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"model":"gpt-4o","messages":[{"role":"user","content":"What is the capital of France?"}]}'
+
+# Responses API
+curl http://localhost:8080/v1/responses \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -d '{
+    "model": "gpt-4.1",
+    "input": "Tell me a three sentence bedtime story about a unicorn."
+  }'
 ```
 
 Or in Python

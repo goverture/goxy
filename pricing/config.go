@@ -12,25 +12,26 @@ import (
 
 // TierPricing represents pricing for a specific service tier
 type TierPricing struct {
-	Prompt     float64 `yaml:"prompt"`
-	Completion float64 `yaml:"completion"`
+	Prompt       float64 `yaml:"prompt"`
+	CachedPrompt float64 `yaml:"cached_prompt"`
+	Completion   float64 `yaml:"completion"`
 }
 
 // ModelPricing represents pricing for a single model with different service tiers
 type ModelPricing struct {
-	Prompt     float64      `yaml:"prompt"`
-	Completion float64      `yaml:"completion"`
-	Flex       *TierPricing `yaml:"flex,omitempty"`
-	Priority   *TierPricing `yaml:"priority,omitempty"`
-	Batch      *TierPricing `yaml:"batch,omitempty"`
-	Aliases    []string     `yaml:"aliases,omitempty"`
+	Prompt       float64      `yaml:"prompt"`
+	CachedPrompt float64      `yaml:"cached_prompt"`
+	Completion   float64      `yaml:"completion"`
+	Flex         *TierPricing `yaml:"flex,omitempty"`
+	Priority     *TierPricing `yaml:"priority,omitempty"`
+	Batch        *TierPricing `yaml:"batch,omitempty"`
+	Aliases      []string     `yaml:"aliases,omitempty"`
 }
 
 // PricingConfig represents the entire pricing configuration
 type PricingConfig struct {
-	Models              map[string]ModelPricing `yaml:"models"`
-	Default             *ModelPricing           `yaml:"default,omitempty"`
-	CachedTokenDiscount float64                 `yaml:"cached_token_discount"`
+	Models  map[string]ModelPricing `yaml:"models"`
+	Default *ModelPricing           `yaml:"default,omitempty"`
 }
 
 var (
@@ -49,11 +50,6 @@ func LoadConfig(configPath string) error {
 	var cfg PricingConfig
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return fmt.Errorf("failed to parse config file %s: %w", configPath, err)
-	}
-
-	// Validate config
-	if cfg.CachedTokenDiscount < 0 || cfg.CachedTokenDiscount > 1 {
-		return fmt.Errorf("cached_token_discount must be between 0 and 1, got %f", cfg.CachedTokenDiscount)
 	}
 
 	config = &cfg
@@ -133,21 +129,21 @@ func (cfg *PricingConfig) FindModelPricing(modelName string) (*ModelPricing, boo
 }
 
 // GetTierPricing returns pricing for a specific service tier, falling back to standard if tier not available
-func (mp *ModelPricing) GetTierPricing(serviceTier string) (prompt, completion float64, tier string) {
+func (mp *ModelPricing) GetTierPricing(serviceTier string) (prompt, cachedPrompt, completion float64, tier string) {
 	switch serviceTier {
 	case "flex":
 		if mp.Flex != nil {
-			return mp.Flex.Prompt, mp.Flex.Completion, "flex"
+			return mp.Flex.Prompt, mp.Flex.CachedPrompt, mp.Flex.Completion, "flex"
 		}
 	case "priority":
 		if mp.Priority != nil {
-			return mp.Priority.Prompt, mp.Priority.Completion, "priority"
+			return mp.Priority.Prompt, mp.Priority.CachedPrompt, mp.Priority.Completion, "priority"
 		}
 	case "batch":
 		if mp.Batch != nil {
-			return mp.Batch.Prompt, mp.Batch.Completion, "batch"
+			return mp.Batch.Prompt, mp.Batch.CachedPrompt, mp.Batch.Completion, "batch"
 		}
 	}
 	// Fallback to standard pricing
-	return mp.Prompt, mp.Completion, "standard"
+	return mp.Prompt, mp.CachedPrompt, mp.Completion, "standard"
 }

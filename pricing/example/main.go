@@ -69,15 +69,16 @@ func main() {
 	customConfig := &pricing.PricingConfig{
 		Models: map[string]pricing.ModelPricing{
 			"custom-model": {
-				Prompt:     0.001,
-				Completion: 0.002,
+				Prompt:       0.001,
+				CachedPrompt: 0.0001,
+				Completion:   0.002,
 			},
 		},
 		Default: &pricing.ModelPricing{
-			Prompt:     0.005,
-			Completion: 0.01,
+			Prompt:       0.005,
+			CachedPrompt: 0.0005,
+			Completion:   0.01,
 		},
-		CachedTokenDiscount: 0.05, // 95% discount for cached tokens
 	}
 
 	// Set the custom configuration

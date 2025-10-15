@@ -29,30 +29,32 @@ type PriceResult struct {
 }
 
 // getPricing returns the pricing for a given model and service tier from configuration
-func getPricing(model Model, serviceTier string) (struct{ Prompt, Completion float64 }, string, error) {
+func getPricing(model Model, serviceTier string) (struct{ Prompt, CachedPrompt, Completion float64 }, string, error) {
 	cfg, err := GetConfig()
 	if err != nil {
-		return struct{ Prompt, Completion float64 }{}, "standard", fmt.Errorf("failed to load pricing config: %w", err)
+		return struct{ Prompt, CachedPrompt, Completion float64 }{}, "standard", fmt.Errorf("failed to load pricing config: %w", err)
 	}
 
 	pricing, found := cfg.FindModelPricing(string(model))
 	if found {
-		prompt, completion, actualTier := pricing.GetTierPricing(serviceTier)
-		return struct{ Prompt, Completion float64 }{
-			Prompt:     prompt,
-			Completion: completion,
+		prompt, cachedPrompt, completion, actualTier := pricing.GetTierPricing(serviceTier)
+		return struct{ Prompt, CachedPrompt, Completion float64 }{
+			Prompt:       prompt,
+			CachedPrompt: cachedPrompt,
+			Completion:   completion,
 		}, actualTier, nil
 	}
 
 	// Fallback to default if configured
 	if cfg.Default != nil {
-		return struct{ Prompt, Completion float64 }{
-			Prompt:     cfg.Default.Prompt,
-			Completion: cfg.Default.Completion,
+		return struct{ Prompt, CachedPrompt, Completion float64 }{
+			Prompt:       cfg.Default.Prompt,
+			CachedPrompt: cfg.Default.CachedPrompt,
+			Completion:   cfg.Default.Completion,
 		}, "standard", nil
 	}
 
-	return struct{ Prompt, Completion float64 }{}, "standard", fmt.Errorf("no pricing found for model %s", model)
+	return struct{ Prompt, CachedPrompt, Completion float64 }{}, "standard", fmt.Errorf("no pricing found for model %s", model)
 }
 
 // resolveModelName determines the canonical model name to use for pricing lookup.
@@ -115,34 +117,35 @@ func ComputePriceWithTier(modelRaw string, u Usage, serviceTier string) (PriceRe
 		fmt.Printf("[pricing] Service tier fallback: %q -> %q for model %q\n", serviceTier, actualTier, modelName)
 	}
 
-	// Get cached token discount from config
-	cfg, configErr := GetConfig()
-	cachedDiscount := 0.1 // default 90% discount
-	if configErr == nil && cfg.CachedTokenDiscount > 0 {
-		cachedDiscount = cfg.CachedTokenDiscount
-	}
-
-	// Apply cached prompt token discount (cached tokens cost a percentage of normal prompt tokens)
-	billedPromptTokens := float64(u.PromptTokens)
+	// Calculate prompt cost: split between cached and non-cached tokens
+	var ptCost float64
 	if u.PromptCachedTokens > 0 {
 		cached := u.PromptCachedTokens
 		if cached > u.PromptTokens {
 			cached = u.PromptTokens
 		}
-		// Effective billed prompt tokens: non-cached + discount% of cached
-		billedPromptTokens = float64(u.PromptTokens-cached) + cachedDiscount*float64(cached)
+		nonCachedTokens := u.PromptTokens - cached
+
+		// Use actual cached prompt pricing from config
+		nonCachedCost := (float64(nonCachedTokens) / 1000000.0) * tiers.Prompt
+		cachedCost := (float64(cached) / 1000000.0) * tiers.CachedPrompt
+		ptCost = nonCachedCost + cachedCost
+	} else {
+		// All prompt tokens are regular (non-cached)
+		ptCost = (float64(u.PromptTokens) / 1000000.0) * tiers.Prompt
 	}
-	ptCost := (billedPromptTokens / 1000000.0) * tiers.Prompt
+
 	ctCost := (float64(u.CompletionTokens) / 1000000.0) * tiers.Completion
 	total := ptCost + ctCost
+
 	note := "prices loaded from config; verify against https://openai.com/api/pricing/"
 	if actualTier != "standard" {
 		note += fmt.Sprintf(" (using %s tier pricing)", actualTier)
 	}
 	if u.PromptCachedTokens > 0 {
-		discountPercent := int((1.0 - cachedDiscount) * 100)
-		note += fmt.Sprintf(" (includes %d%% discount for cached prompt tokens)", discountPercent)
+		note += fmt.Sprintf(" (includes cached prompt token pricing)")
 	}
+
 	return PriceResult{
 		Model:             m,
 		ServiceTier:       actualTier,

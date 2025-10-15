@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/goverture/goxy/config"
-	"github.com/goverture/goxy/limit"
 	"github.com/goverture/goxy/pricing"
 )
 
@@ -31,7 +30,7 @@ func (t stripForwardingHeaders) RoundTrip(r *http.Request) (*http.Response, erro
 	return t.base.RoundTrip(r)
 }
 
-func NewProxyHandler(mgr *limit.Manager) http.Handler {
+func NewProxyHandler(mgr *pricing.Manager) http.Handler {
 	upstreamURL := config.Cfg.OpenAIBaseURL
 	upstream, err := url.Parse(upstreamURL)
 	if err != nil {

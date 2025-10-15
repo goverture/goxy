@@ -1,4 +1,4 @@
-package limit
+package pricing
 
 import (
 	"math"
@@ -6,8 +6,6 @@ import (
 	"testing"
 	"time"
 )
-
-func almostEqual(a, b float64) bool { return math.Abs(a-b) < 1e-9 }
 
 func TestAllowAndAddCostProgression(t *testing.T) {
 	m := NewManager(1.0) // $1 per hour

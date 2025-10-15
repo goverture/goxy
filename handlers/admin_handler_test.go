@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/goverture/goxy/limit"
+	"github.com/goverture/goxy/pricing"
 )
 
 func TestMaskAPIKey(t *testing.T) {
@@ -60,7 +60,7 @@ func TestMaskAPIKey(t *testing.T) {
 }
 
 func TestAdminHandler_HealthCheck(t *testing.T) {
-	mgr := limit.NewManager(2.0)
+	mgr := pricing.NewManager(2.0)
 	adminHandler := NewAdminHandler(mgr)
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
@@ -87,7 +87,7 @@ func TestAdminHandler_HealthCheck(t *testing.T) {
 }
 
 func TestAdminHandler_HealthCheck_WrongMethod(t *testing.T) {
-	mgr := limit.NewManager(2.0)
+	mgr := pricing.NewManager(2.0)
 	adminHandler := NewAdminHandler(mgr)
 
 	req := httptest.NewRequest(http.MethodPost, "/health", nil)
@@ -101,7 +101,7 @@ func TestAdminHandler_HealthCheck_WrongMethod(t *testing.T) {
 }
 
 func TestAdminHandler_GetUsage_EmptyUsage(t *testing.T) {
-	mgr := limit.NewManager(2.0)
+	mgr := pricing.NewManager(2.0)
 	adminHandler := NewAdminHandler(mgr)
 
 	req := httptest.NewRequest(http.MethodGet, "/usage", nil)
@@ -128,7 +128,7 @@ func TestAdminHandler_GetUsage_EmptyUsage(t *testing.T) {
 }
 
 func TestAdminHandler_GetUsage_WithMaskedKeys(t *testing.T) {
-	mgr := limit.NewManager(2.0)
+	mgr := pricing.NewManager(2.0)
 	adminHandler := NewAdminHandler(mgr)
 
 	// Simulate some usage by adding cost for different keys
@@ -176,7 +176,7 @@ func TestAdminHandler_GetUsage_WithMaskedKeys(t *testing.T) {
 }
 
 func TestAdminHandler_GetUsage_WrongMethod(t *testing.T) {
-	mgr := limit.NewManager(2.0)
+	mgr := pricing.NewManager(2.0)
 	adminHandler := NewAdminHandler(mgr)
 
 	req := httptest.NewRequest(http.MethodPost, "/usage", nil)
@@ -199,7 +199,7 @@ func TestAdminHandler_GetUsage_WrongMethod(t *testing.T) {
 }
 
 func TestAdminHandler_UpdateLimit_Success(t *testing.T) {
-	mgr := limit.NewManager(2.0)
+	mgr := pricing.NewManager(2.0)
 	adminHandler := NewAdminHandler(mgr)
 
 	requestBody := LimitUpdateRequest{LimitUSD: 5.0}
@@ -240,7 +240,7 @@ func TestAdminHandler_UpdateLimit_Success(t *testing.T) {
 }
 
 func TestAdminHandler_UpdateLimit_InvalidJSON(t *testing.T) {
-	mgr := limit.NewManager(2.0)
+	mgr := pricing.NewManager(2.0)
 	adminHandler := NewAdminHandler(mgr)
 
 	req := httptest.NewRequest("PUT", "/limit", bytes.NewBufferString("{invalid json}"))
@@ -264,7 +264,7 @@ func TestAdminHandler_UpdateLimit_InvalidJSON(t *testing.T) {
 }
 
 func TestAdminHandler_UpdateLimit_WrongMethod(t *testing.T) {
-	mgr := limit.NewManager(2.0)
+	mgr := pricing.NewManager(2.0)
 	adminHandler := NewAdminHandler(mgr)
 
 	req := httptest.NewRequest(http.MethodGet, "/limit", nil)
@@ -287,7 +287,7 @@ func TestAdminHandler_UpdateLimit_WrongMethod(t *testing.T) {
 }
 
 func TestAdminHandler_ServeHTTP_NotFoundEndpoint(t *testing.T) {
-	mgr := limit.NewManager(2.0)
+	mgr := pricing.NewManager(2.0)
 	adminHandler := NewAdminHandler(mgr)
 
 	req := httptest.NewRequest(http.MethodGet, "/nonexistent", nil)
@@ -314,7 +314,7 @@ func TestAdminHandler_ServeHTTP_NotFoundEndpoint(t *testing.T) {
 }
 
 func TestAdminHandler_ServeHTTP_OptionsRequest(t *testing.T) {
-	mgr := limit.NewManager(2.0)
+	mgr := pricing.NewManager(2.0)
 	adminHandler := NewAdminHandler(mgr)
 
 	req := httptest.NewRequest(http.MethodOptions, "/usage", nil)
@@ -338,7 +338,7 @@ func TestAdminHandler_ServeHTTP_OptionsRequest(t *testing.T) {
 }
 
 func TestAdminHandler_ServeHTTP_CORSHeaders(t *testing.T) {
-	mgr := limit.NewManager(2.0)
+	mgr := pricing.NewManager(2.0)
 	adminHandler := NewAdminHandler(mgr)
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)

@@ -6,16 +6,48 @@ models:
     prompt: 1.25
     cached_prompt: 0.125
     completion: 10.0
+    flex:
+      prompt: 0.625
+      cached_prompt: 0.0625
+      completion: 5.0
+    batch:
+      prompt: 0.625
+      cached_prompt: 0.0625
+      completion: 5.0
+    priority:
+      prompt: 2.5
+      cached_prompt: 0.25
+      completion: 20.0
 
   gpt-5-mini:
     prompt: 0.25
     cached_prompt: 0.025
     completion: 2.0
+    flex:
+      prompt: 0.125
+      cached_prompt: 0.0125
+      completion: 1.0
+    batch:
+      prompt: 0.125
+      cached_prompt: 0.0125
+      completion: 1.0
+    priority:
+      prompt: 0.45
+      cached_prompt: 0.045
+      completion: 3.6
 
   gpt-5-nano:
     prompt: 0.05
     cached_prompt: 0.005
     completion: 0.4
+    flex:
+      prompt: 0.025
+      cached_prompt: 0.0025
+      completion: 0.2
+    batch:
+      prompt: 0.025
+      cached_prompt: 0.0025
+      completion: 0.2
 
   gpt-5-chat-latest:
     prompt: 1.25
@@ -30,35 +62,79 @@ models:
   gpt-5-pro:
     prompt: 15.0
     completion: 120.0
+    batch:
+      prompt: 7.5
+      completion: 60.0
 
   gpt-4.1:
     prompt: 2.0
     cached_prompt: 0.5
     completion: 8.0
+    batch:
+      prompt: 1.0
+      completion: 4.0
+    priority:
+      prompt: 3.5
+      cached_prompt: 0.875
+      completion: 14.0
 
   gpt-4.1-mini:
     prompt: 0.4
     cached_prompt: 0.1
     completion: 1.6
+    batch:
+      prompt: 0.2
+      completion: 0.8
+    priority:
+      prompt: 0.7
+      cached_prompt: 0.175
+      completion: 2.8
 
   gpt-4.1-nano:
     prompt: 0.1
     cached_prompt: 0.025
     completion: 0.4
+    batch:
+      prompt: 0.05
+      completion: 0.2
+    priority:
+      prompt: 0.2
+      cached_prompt: 0.05
+      completion: 0.8
 
   gpt-4o:
     prompt: 2.5
     cached_prompt: 1.25
     completion: 10.0
+    batch:
+      prompt: 1.25
+      completion: 5.0
+    priority:
+      prompt: 4.25
+      cached_prompt: 2.125
+      completion: 17.0
 
   gpt-4o-2024-05-13:
     prompt: 5.0
     completion: 15.0
+    batch:
+      prompt: 2.5
+      completion: 7.5
+    priority:
+      prompt: 8.75
+      completion: 26.25
 
   gpt-4o-mini:
     prompt: 0.15
     cached_prompt: 0.075
     completion: 0.6
+    batch:
+      prompt: 0.075
+      completion: 0.3
+    priority:
+      prompt: 0.25
+      cached_prompt: 0.125
+      completion: 1.0
 
   gpt-realtime:
     prompt: 4
@@ -70,34 +146,28 @@ models:
     cached_prompt: 0.06
     completion: 2.4
 
-  # gpt-4o-realtime-preview	$5.00	$2.50	$20.00
   gpt-4o-realtime-preview:
     prompt: 5.0
     cached_prompt: 2.5
     completion: 20.0
 
-  # gpt-4o-mini-realtime-preview	$0.60	$0.30	$2.40
   gpt-4o-mini-realtime-preview:
     prompt: 0.6
     cached_prompt: 0.3
     completion: 2.4
 
-  # gpt-audio	$2.50	-	$10.00
   gpt-audio:
     prompt: 2.5
     completion: 10.0
-  
-  # gpt-audio-mini	$0.60	-	$2.40
+
   gpt-audio-mini:
     prompt: 0.6
     completion: 2.4
 
-  # gpt-4o-audio-preview	$2.50	-	$10.00
   gpt-4o-audio-preview:
     prompt: 2.5
     completion: 10.0
-  
-  # gpt-4o-mini-audio-preview	$0.15	-	$0.60
+
   gpt-4o-mini-audio-preview:
     prompt: 0.15
     completion: 0.6
@@ -106,77 +176,116 @@ models:
     prompt: 15.0
     cached_prompt: 7.5
     completion: 60.0
+    batch:
+      prompt: 7.5
+      completion: 30.0
 
   o1-pro:
     prompt: 150.0
     completion: 600.0
-
-  o3-pro:
-    prompt: 20.0
-    completion: 80.0
+    batch:
+      prompt: 75.0
+      completion: 300.0
 
   o3:
     prompt: 2.0
     cached_prompt: 0.5
     completion: 8.0
+    flex:
+      prompt: 1.0
+      cached_prompt: 0.25
+      completion: 4.0
+    batch:
+      prompt: 1.0
+      completion: 4.0
+    priority:
+      prompt: 3.5
+      cached_prompt: 0.875
+      completion: 14.0
+
+  o3-pro:
+    prompt: 20.0
+    completion: 80.0
+    batch:
+      prompt: 10.0
+      completion: 40.0
 
   o3-deep-research:
     prompt: 10.0
     cached_prompt: 2.5
     completion: 40.0
+    batch:
+      prompt: 5.0
+      completion: 20.0
 
   o4-mini:
     prompt: 1.1
     cached_prompt: 0.275
     completion: 4.4
+    flex:
+      prompt: 0.55
+      cached_prompt: 0.138
+      completion: 2.2
+    batch:
+      prompt: 0.55
+      completion: 2.2
+    priority:
+      prompt: 2.0
+      cached_prompt: 0.5
+      completion: 8.0
 
   o4-mini-deep-research:
     prompt: 2.0
     cached_prompt: 0.5
     completion: 8.0
+    batch:
+      prompt: 1.0
+      completion: 4.0
 
   o3-mini:
     prompt: 1.1
     cached_prompt: 0.55
     completion: 4.4
+    batch:
+      prompt: 0.55
+      completion: 2.2
 
   o1-mini:
     prompt: 1.1
     cached_prompt: 0.55
     completion: 4.4
+    batch:
+      prompt: 0.55
+      completion: 2.2
 
-# codex-mini-latest	$1.50	$0.375	$6.00
   codex-mini-latest:
     prompt: 1.5
     cached_prompt: 0.375
     completion: 6.0
 
-# gpt-4o-mini-search-preview	$0.15	-	$0.60
   gpt-4o-mini-search-preview:
     prompt: 0.15
     completion: 0.6
 
-# gpt-4o-search-preview	$2.50	-	$10.00
   gpt-4o-search-preview:
     prompt: 2.5
     completion: 10.0
 
-# computer-use-preview	$3.00	-	$12.00
   computer-use-preview:
     prompt: 3.0
-    completion: 12.0    
+    completion: 12.0
+    batch:
+      prompt: 1.5
+      completion: 6.0
 
-# gpt-image-1	$5.00	$1.25	-
   gpt-image-1:
     prompt: 5.0
     cached_prompt: 1.25
 
-# gpt-image-1-mini	$2.00	$0.20	-
   gpt-image-1-mini:
     prompt: 2.0
-    cached_prompt: 0.2 
+    cached_prompt: 0.2
 
-# Default pricing for unknown models (optional)
 default:
   prompt: 10.0
   completion: 20.0

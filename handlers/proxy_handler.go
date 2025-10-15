@@ -119,6 +119,12 @@ func NewProxyHandler(mgr *limit.Manager) http.Handler {
 				fmt.Println("[proxy] Upstream JSON response:\n" + string(pretty))
 				// Attempt pricing if usage + model present
 				modelName, _ := parsed["model"].(string)
+				// Service tier - default to "standard" if not present or not a string
+				serviceTier := "standard"
+				if tierRaw, ok := parsed["service_tier"].(string); ok && tierRaw != "" {
+					serviceTier = tierRaw
+				}
+
 				if usageRaw, ok := parsed["usage"].(map[string]interface{}); ok {
 					u := pricing.Usage{}
 					if v, ok := usageRaw["prompt_tokens"].(float64); ok {
@@ -133,7 +139,7 @@ func NewProxyHandler(mgr *limit.Manager) http.Handler {
 							u.PromptCachedTokens = int(v)
 						}
 					}
-					if pr, err := pricing.ComputePrice(modelName, u); err == nil {
+					if pr, err := pricing.ComputePriceWithTier(modelName, u, serviceTier); err == nil {
 						fmt.Println(pr.String())
 						// accumulate cost toward spend limit (use Authorization header as-is, or blank for unauthenticated)
 						auth := resp.Request.Header.Get("Authorization")

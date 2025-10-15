@@ -125,7 +125,7 @@ func ComputePriceWithTier(modelRaw string, u Usage, serviceTier string) (PriceRe
 			cached = u.PromptTokens
 		}
 		nonCachedTokens := u.PromptTokens - cached
-		
+
 		// Use actual cached prompt pricing from config
 		nonCachedCost := (float64(nonCachedTokens) / 1000000.0) * tiers.Prompt
 		cachedCost := (float64(cached) / 1000000.0) * tiers.CachedPrompt
@@ -134,10 +134,10 @@ func ComputePriceWithTier(modelRaw string, u Usage, serviceTier string) (PriceRe
 		// All prompt tokens are regular (non-cached)
 		ptCost = (float64(u.PromptTokens) / 1000000.0) * tiers.Prompt
 	}
-	
+
 	ctCost := (float64(u.CompletionTokens) / 1000000.0) * tiers.Completion
 	total := ptCost + ctCost
-	
+
 	note := "prices loaded from config; verify against https://openai.com/api/pricing/"
 	if actualTier != "standard" {
 		note += fmt.Sprintf(" (using %s tier pricing)", actualTier)
@@ -145,7 +145,7 @@ func ComputePriceWithTier(modelRaw string, u Usage, serviceTier string) (PriceRe
 	if u.PromptCachedTokens > 0 {
 		note += fmt.Sprintf(" (includes cached prompt token pricing)")
 	}
-	
+
 	return PriceResult{
 		Model:             m,
 		ServiceTier:       actualTier,

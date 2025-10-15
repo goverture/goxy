@@ -77,13 +77,13 @@ func TestComputePrice_WithCachedPromptTokens(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	
+
 	// Calculate expected cost using separate pricing
 	// 40 normal prompt tokens at 3.0 per million + 60 cached tokens at 0.3 per million
 	nonCachedCost := (40.0 / 1000000.0) * 3.0
 	cachedCost := (60.0 / 1000000.0) * 0.3
 	expectedPromptCost := nonCachedCost + cachedCost
-	
+
 	if !almostEqual(res.PromptCostUSD, expectedPromptCost) {
 		t.Fatalf("prompt cost mismatch with cache: got %f want %f", res.PromptCostUSD, expectedPromptCost)
 	}
@@ -101,11 +101,11 @@ func TestFloat64PrecisionWithCheapestModel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to load pricing config: %v", err)
 	}
-	
+
 	// Test with gpt-5-nano which has the cheapest rate
 	// From pricing.yaml: cached_prompt in flex/batch tiers is 0.0025 per million tokens (cheapest rate!)
 	modelName := "gpt-5-nano"
-	
+
 	// Test 1: Single cached prompt token precision (cheapest possible billing)
 	t.Run("single_cached_prompt_token_precision", func(t *testing.T) {
 		// 1 prompt token, all cached, 0 completion tokens - cheapest possible request
@@ -114,27 +114,27 @@ func TestFloat64PrecisionWithCheapestModel(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		
+
 		// Expected cost calculation:
 		// billedPromptTokens = 0 + 0.1 * 1 = 0.1 effective tokens (90% discount)
 		// flex tier for gpt-5-nano has cached_prompt rate of 0.0025 per million tokens
 		// cost = (1.0 / 1000000.0) * 0.0025 = 0.0000000025 USD
 		expectedCost := (1.0 / 1000000.0) * 0.0025
-		
+
 		if !almostEqual(res.PromptCostUSD, expectedCost) {
-			t.Errorf("single cached token cost precision issue: got %.15f, want %.15f, diff=%.2e", 
+			t.Errorf("single cached token cost precision issue: got %.15f, want %.15f, diff=%.2e",
 				res.PromptCostUSD, expectedCost, math.Abs(res.PromptCostUSD-expectedCost))
 		}
-		
+
 		t.Logf("Single cached prompt token cost: $%.15f (expected: $%.15f)", res.PromptCostUSD, expectedCost)
 		t.Logf("This is the absolute cheapest possible API call!")
 	})
-	
+
 	// Test 2: Accumulation of many single cached token requests
 	t.Run("cached_token_accumulation_precision", func(t *testing.T) {
 		numRequests := 100
 		var totalCostAccumulated float64
-		
+
 		// Calculate cost of 100 individual requests with 1 cached token each
 		for i := 0; i < numRequests; i++ {
 			usage := Usage{PromptTokens: 1, PromptCachedTokens: 1, CompletionTokens: 0}
@@ -144,59 +144,59 @@ func TestFloat64PrecisionWithCheapestModel(t *testing.T) {
 			}
 			totalCostAccumulated += res.PromptCostUSD
 		}
-		
+
 		// Calculate cost of a single request with 100 cached tokens
 		usage100 := Usage{PromptTokens: 100, PromptCachedTokens: 100, CompletionTokens: 0}
 		res100, err := ComputePriceWithTier(modelName, usage100, "flex")
 		if err != nil {
 			t.Fatalf("unexpected error for 100-cached-token request: %v", err)
 		}
-		
+
 		// Compare the two approaches
 		diff := math.Abs(totalCostAccumulated - res100.PromptCostUSD)
 		relativeDiff := diff / res100.PromptCostUSD
-		
+
 		t.Logf("100 x 1-cached-token requests: $%.15f", totalCostAccumulated)
 		t.Logf("1 x 100-cached-token request:  $%.15f", res100.PromptCostUSD)
 		t.Logf("Absolute difference:           $%.2e", diff)
 		t.Logf("Relative difference:           %.2e (%.8f%%)", relativeDiff, relativeDiff*100)
-		
+
 		// The difference should be negligible (less than 0.01% relative error)
 		if relativeDiff > 1e-4 {
 			t.Errorf("accumulation precision issue: relative difference %.2e exceeds threshold", relativeDiff)
 		}
 	})
-	
+
 	// Test 3: Test extreme precision with many tiny cached token costs
 	t.Run("extreme_cached_token_precision", func(t *testing.T) {
 		// Test with the smallest possible billing unit
 		numRequests := 10000
 		var totalCost float64
-		
+
 		// Each request: 1 cached prompt token (with 90% discount)
 		for i := 0; i < numRequests; i++ {
 			billedTokens := 0.1 // 90% discount
 			costPerRequest := (billedTokens / 1000000.0) * 0.0025
 			totalCost += costPerRequest
 		}
-		
+
 		// Expected total cost
 		expectedTotal := (float64(numRequests) * 0.1 / 1000000.0) * 0.0025
-		
+
 		diff := math.Abs(totalCost - expectedTotal)
 		relativeDiff := diff / expectedTotal
-		
+
 		t.Logf("10000 x single-cached-token calculations: $%.15f", totalCost)
 		t.Logf("Expected total:                           $%.15f", expectedTotal)
 		t.Logf("Absolute difference:                      $%.2e", diff)
 		t.Logf("Relative difference:                      %.2e", relativeDiff)
-		
+
 		// For this extreme case, allow slightly higher tolerance due to floating point accumulation
 		if relativeDiff > 1e-10 {
 			t.Errorf("extreme cached token precision issue: relative difference %.2e too large", relativeDiff)
 		}
 	})
-	
+
 	// Test 4: Compare with regular prompt tokens to verify the discount calculation
 	t.Run("cached_vs_regular_token_precision", func(t *testing.T) {
 		// Test regular prompt token
@@ -205,22 +205,22 @@ func TestFloat64PrecisionWithCheapestModel(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error for regular token: %v", err)
 		}
-		
+
 		// Test cached prompt token
 		usageCached := Usage{PromptTokens: 1, PromptCachedTokens: 1, CompletionTokens: 0}
 		resCached, err := ComputePriceWithTier(modelName, usageCached, "flex")
 		if err != nil {
 			t.Fatalf("unexpected error for cached token: %v", err)
 		}
-		
+
 		// Cached should be exactly 10% of regular (90% discount)
 		expectedCachedCost := resRegular.PromptCostUSD * 0.1
-		
+
 		if !almostEqual(resCached.PromptCostUSD, expectedCachedCost) {
-			t.Errorf("cached discount precision issue: got %.15f, want %.15f", 
+			t.Errorf("cached discount precision issue: got %.15f, want %.15f",
 				resCached.PromptCostUSD, expectedCachedCost)
 		}
-		
+
 		t.Logf("Regular prompt token cost:  $%.15f", resRegular.PromptCostUSD)
 		t.Logf("Cached prompt token cost:   $%.15f", resCached.PromptCostUSD)
 		t.Logf("Discount ratio:             %.3f (should be 0.100)", resCached.PromptCostUSD/resRegular.PromptCostUSD)

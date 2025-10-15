@@ -19,15 +19,16 @@ func setupTestPricingConfig() {
 	testConfig := &pricing.PricingConfig{
 		Models: map[string]pricing.ModelPricing{
 			"gpt-4o": {
-				Prompt:     5.0,
-				Completion: 15.0,
+				Prompt:       5.0,
+				CachedPrompt: 2.5,
+				Completion:   15.0,
 			},
 		},
 		Default: &pricing.ModelPricing{
-			Prompt:     10.0,
-			Completion: 20.0,
+			Prompt:       10.0,
+			CachedPrompt: 1.0,
+			Completion:   20.0,
 		},
-		CachedTokenDiscount: 0.1,
 	}
 	pricing.SetConfig(testConfig)
 }

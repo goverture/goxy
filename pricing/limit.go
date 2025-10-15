@@ -1,11 +1,11 @@
-package limit
+package pricing
 
 import (
 	"sync"
 	"time"
 )
 
-// manager maintains per-key rolling (hour-bucket) spend tracking.
+// Manager maintains per-key rolling (hour-bucket) spend tracking.
 // A simple fixed 1h window that resets when an hour has elapsed since first spend
 // in the window. Good enough for coarse limiting; not a precise sliding window.
 // Semantics:

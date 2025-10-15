@@ -8,7 +8,7 @@ import (
 
 	"github.com/goverture/goxy/config"
 	"github.com/goverture/goxy/handlers"
-	"github.com/goverture/goxy/limit"
+	"github.com/goverture/goxy/pricing"
 )
 
 var (
@@ -29,7 +29,7 @@ func main() {
 	log.Printf("Config: %+v", config.Cfg)
 
 	// Create limit manager
-	limitMgr := limit.NewManager(config.Cfg.SpendLimitPerHour)
+	limitMgr := pricing.NewManager(config.Cfg.SpendLimitPerHour)
 
 	// Create proxy handler and admin handler
 	proxyHandler := handlers.NewProxyHandler(limitMgr)

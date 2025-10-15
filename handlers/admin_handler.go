@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/goverture/goxy/limit"
+	"github.com/goverture/goxy/pricing"
 )
 
 // maskAPIKey masks an API key to show only first 4 and last 4 characters
@@ -34,18 +34,18 @@ func maskAPIKey(key string) string {
 
 // AdminHandler provides endpoints for monitoring usage and updating limits
 type AdminHandler struct {
-	manager *limit.Manager
+	manager *pricing.Manager
 }
 
 // NewAdminHandler creates a new admin handler with the given limit manager
-func NewAdminHandler(manager *limit.Manager) *AdminHandler {
+func NewAdminHandler(manager *pricing.Manager) *AdminHandler {
 	return &AdminHandler{manager: manager}
 }
 
 // UsageResponse represents the response for usage queries
 type UsageResponse struct {
-	Usage []limit.UsageInfo `json:"usage"`
-	Total int               `json:"total"`
+	Usage []pricing.UsageInfo `json:"usage"`
+	Total int                 `json:"total"`
 }
 
 // LimitUpdateRequest represents the request to update spending limits

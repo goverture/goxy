@@ -16,18 +16,6 @@ type Usage struct {
 	TotalTokens        int `json:"total_tokens"`
 }
 
-// PriceResult holds the computed pricing info.
-type PriceResult struct {
-	Model             Model
-	ServiceTier       string
-	PromptTokens      int
-	CompletionTokens  int
-	PromptCostUSD     float64
-	CompletionCostUSD float64
-	TotalCostUSD      float64
-	Note              string
-}
-
 // PriceResultMoney holds the computed pricing info using Money type for precision.
 type PriceResultMoney struct {
 	Model            Model
@@ -73,35 +61,6 @@ func resolveModelName(raw string) string {
 
 	// Not found in config or via prefix, return as-is
 	return raw
-}
-
-// ComputePrice calculates cost given usage and model (using standard pricing).
-// Now uses integer-based Money internally for precision, but returns float64 for compatibility.
-func ComputePrice(modelRaw string, u Usage) (PriceResult, error) {
-	return ComputePriceWithTier(modelRaw, u, "standard")
-}
-
-// ComputePriceWithTier calculates cost given usage, model, and service tier.
-// Now uses integer-based Money internally for precision, but returns float64 for compatibility.
-func ComputePriceWithTier(modelRaw string, u Usage, serviceTier string) (PriceResult, error) {
-	// Use the Money-based computation internally for precision
-	moneyResult, err := ComputePriceMoneyWithTier(modelRaw, u, serviceTier)
-	if err != nil {
-		return PriceResult{
-			Model:            Model(resolveModelName(modelRaw)),
-			ServiceTier:      serviceTier,
-			PromptTokens:     u.PromptTokens,
-			CompletionTokens: u.CompletionTokens,
-			Note:             "unknown model pricing",
-		}, nil
-	}
-
-	// Convert Money result to legacy float64 format
-	return moneyResult.ToLegacy(), nil
-}
-
-func (pr PriceResult) String() string {
-	return fmt.Sprintf("[pricing] model=%s tier=%s prompt=%d completion=%d cost_prompt=$%.6f cost_completion=$%.6f total=$%.6f", pr.Model, pr.ServiceTier, pr.PromptTokens, pr.CompletionTokens, pr.PromptCostUSD, pr.CompletionCostUSD, pr.TotalCostUSD)
 }
 
 // getPricingMoney returns the Money-based pricing for a given model and service tier from configuration
@@ -202,20 +161,6 @@ func ComputePriceMoneyWithTier(modelRaw string, u Usage, serviceTier string) (Pr
 		TotalCost:        total,
 		Note:             note,
 	}, nil
-}
-
-// ToLegacy converts PriceResultMoney to PriceResult for backward compatibility
-func (pr PriceResultMoney) ToLegacy() PriceResult {
-	return PriceResult{
-		Model:             pr.Model,
-		ServiceTier:       pr.ServiceTier,
-		PromptTokens:      pr.PromptTokens,
-		CompletionTokens:  pr.CompletionTokens,
-		PromptCostUSD:     pr.PromptCost.ToUSD(),
-		CompletionCostUSD: pr.CompletionCost.ToUSD(),
-		TotalCostUSD:      pr.TotalCost.ToUSD(),
-		Note:              pr.Note,
-	}
 }
 
 func (pr PriceResultMoney) String() string {

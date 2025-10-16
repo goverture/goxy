@@ -24,25 +24,13 @@ func TestIntegerBasedPricingBenefits(t *testing.T) {
 		CompletionTokens:   750000,  // 750K completion
 	}
 
-	// Test with Money-based computation (new way)
+	// Test with Money-based computation
 	moneyResult, err := ComputePriceMoney("test-micro", usage)
 	if err != nil {
 		t.Fatalf("ComputePriceMoney failed: %v", err)
 	}
 
-	// Test with legacy computation (now delegates to Money internally)
-	legacyResult, err := ComputePrice("test-micro", usage)
-	if err != nil {
-		t.Fatalf("ComputePrice failed: %v", err)
-	}
-
-	// Now they should be identical because ComputePrice uses Money internally
-	if legacyResult.PromptCostUSD != moneyResult.PromptCost.ToUSD() {
-		t.Errorf("Results should be identical now. Legacy: %f, Money: %f",
-			legacyResult.PromptCostUSD, moneyResult.PromptCost.ToUSD())
-	}
-
-	// Demonstrate that we get exact precision with Money
+	// Verify precision - the key benefit of Money-based arithmetic
 	expectedPromptCostNonCached := NewMoneyFromUSD(0.000001).Multiply(500000.0 / 1000000.0) // 500K non-cached tokens
 	expectedPromptCostCached := NewMoneyFromUSD(0.0000001).Multiply(500000.0 / 1000000.0)   // 500K cached tokens
 	expectedTotalPromptCost := expectedPromptCostNonCached.Add(expectedPromptCostCached)
@@ -53,6 +41,5 @@ func TestIntegerBasedPricingBenefits(t *testing.T) {
 	}
 
 	t.Logf("✅ Money-based result: %s", moneyResult.String())
-	t.Logf("✅ Legacy result (now uses Money): Total=$%.8f", legacyResult.TotalCostUSD)
-	t.Logf("✅ Results are identical: %v", legacyResult.TotalCostUSD == moneyResult.TotalCost.ToUSD())
+	t.Logf("✅ Exact integer-based precision achieved!")
 }

@@ -214,3 +214,10 @@ func TestManagerMoney_BackwardCompatibility(t *testing.T) {
 		t.Errorf("Legacy remaining USD should be %f, got %f", expectedRemainingUSD, usageLegacy.Remaining)
 	}
 }
+
+func abs(x float64) float64 {
+	if x < 0 {
+		return -x
+	}
+	return x
+}

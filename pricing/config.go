@@ -175,33 +175,33 @@ func (mp *ModelPricing) GetTierPricing(serviceTier string) (prompt, cachedPrompt
 // ToMoney converts float64-based ModelPricing to Money-based ModelPricingMoney
 func (mp *ModelPricing) ToMoney() ModelPricingMoney {
 	result := ModelPricingMoney{
-		Prompt:       NewMoneyFromUSD(mp.Prompt),
-		CachedPrompt: NewMoneyFromUSD(mp.CachedPrompt),
-		Completion:   NewMoneyFromUSD(mp.Completion),
+		Prompt:       NewMoneyFromUSD(mp.Prompt / 1000000.0),
+		CachedPrompt: NewMoneyFromUSD(mp.CachedPrompt / 1000000.0),
+		Completion:   NewMoneyFromUSD(mp.Completion / 1000000.0),
 		Aliases:      mp.Aliases,
 	}
 
 	if mp.Flex != nil {
 		result.Flex = &TierPricingMoney{
-			Prompt:       NewMoneyFromUSD(mp.Flex.Prompt),
-			CachedPrompt: NewMoneyFromUSD(mp.Flex.CachedPrompt),
-			Completion:   NewMoneyFromUSD(mp.Flex.Completion),
+			Prompt:       NewMoneyFromUSD(mp.Flex.Prompt / 1000000.0),
+			CachedPrompt: NewMoneyFromUSD(mp.Flex.CachedPrompt / 1000000.0),
+			Completion:   NewMoneyFromUSD(mp.Flex.Completion / 1000000.0),
 		}
 	}
 
 	if mp.Priority != nil {
 		result.Priority = &TierPricingMoney{
-			Prompt:       NewMoneyFromUSD(mp.Priority.Prompt),
-			CachedPrompt: NewMoneyFromUSD(mp.Priority.CachedPrompt),
-			Completion:   NewMoneyFromUSD(mp.Priority.Completion),
+			Prompt:       NewMoneyFromUSD(mp.Priority.Prompt / 1000000.0),
+			CachedPrompt: NewMoneyFromUSD(mp.Priority.CachedPrompt / 1000000.0),
+			Completion:   NewMoneyFromUSD(mp.Priority.Completion / 1000000.0),
 		}
 	}
 
 	if mp.Batch != nil {
 		result.Batch = &TierPricingMoney{
-			Prompt:       NewMoneyFromUSD(mp.Batch.Prompt),
-			CachedPrompt: NewMoneyFromUSD(mp.Batch.CachedPrompt),
-			Completion:   NewMoneyFromUSD(mp.Batch.Completion),
+			Prompt:       NewMoneyFromUSD(mp.Batch.Prompt / 1000000.0),
+			CachedPrompt: NewMoneyFromUSD(mp.Batch.CachedPrompt / 1000000.0),
+			Completion:   NewMoneyFromUSD(mp.Batch.Completion / 1000000.0),
 		}
 	}
 

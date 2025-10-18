@@ -30,7 +30,7 @@ func (t stripForwardingHeaders) RoundTrip(r *http.Request) (*http.Response, erro
 	return t.base.RoundTrip(r)
 }
 
-func NewProxyHandler(mgr *pricing.Manager) http.Handler {
+func NewProxyHandler(mgr *pricing.ManagerMoney) http.Handler {
 	upstreamURL := config.Cfg.OpenAIBaseURL
 	upstream, err := url.Parse(upstreamURL)
 	if err != nil {
@@ -125,11 +125,12 @@ func NewProxyHandler(mgr *pricing.Manager) http.Handler {
 				}
 
 				if usage, ok := parseUsageFromResponse(parsed); ok {
-					if pr, err := pricing.ComputePriceWithTier(modelName, usage, serviceTier); err == nil {
+					// Use the new Money-based pricing for precision
+					if pr, err := pricing.CalculatePriceWithTier(modelName, usage, serviceTier); err == nil {
 						fmt.Println(pr.String())
 						// accumulate cost toward spend limit (use Authorization header as-is, or blank for unauthenticated)
 						auth := resp.Request.Header.Get("Authorization")
-						mgr.AddCost(auth, pr.TotalCostUSD)
+						mgr.AddCost(auth, pr.TotalCost)
 					}
 				}
 			} else {
@@ -165,12 +166,12 @@ func NewProxyHandler(mgr *pricing.Manager) http.Handler {
 			// RateLimit-Limit: total allowed per window (here monetary, USD)
 			// RateLimit-Remaining: remaining allowance (0 when blocked)
 			// RateLimit-Reset: seconds until window resets
-			w.Header().Set("RateLimit-Limit", fmt.Sprintf("%.2f", lim))
+			w.Header().Set("RateLimit-Limit", fmt.Sprintf("%.2f", lim.ToUSD()))
 			w.Header().Set("RateLimit-Remaining", "0")
 			w.Header().Set("RateLimit-Reset", strconv.Itoa(secUntil))
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusTooManyRequests)
-			fmt.Fprintf(w, `{"error":"spend limit exceeded","limit_per_hour":%.2f,"spent_this_window":%.4f,"window_ends_at":"%s","retry_after_seconds":%d}`, lim, spent, windowEnd.UTC().Format(time.RFC3339), secUntil)
+			fmt.Fprintf(w, `{"error":"spend limit exceeded","limit_per_hour":%.2f,"spent_this_window":%.4f,"window_ends_at":"%s","retry_after_seconds":%d}`, lim.ToUSD(), spent.ToUSD(), windowEnd.UTC().Format(time.RFC3339), secUntil)
 			return
 		}
 

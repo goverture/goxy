@@ -17,6 +17,13 @@ type TierPricing struct {
 	Completion   float64 `yaml:"completion"`
 }
 
+// TierPricingMoney represents pricing for a specific service tier using Money type
+type TierPricingMoney struct {
+	Prompt       Money
+	CachedPrompt Money
+	Completion   Money
+}
+
 // ModelPricing represents pricing for a single model with different service tiers
 type ModelPricing struct {
 	Prompt       float64      `yaml:"prompt"`
@@ -28,10 +35,27 @@ type ModelPricing struct {
 	Aliases      []string     `yaml:"aliases,omitempty"`
 }
 
+// ModelPricingMoney represents pricing for a single model using Money type
+type ModelPricingMoney struct {
+	Prompt       Money
+	CachedPrompt Money
+	Completion   Money
+	Flex         *TierPricingMoney
+	Priority     *TierPricingMoney
+	Batch        *TierPricingMoney
+	Aliases      []string
+}
+
 // PricingConfig represents the entire pricing configuration
 type PricingConfig struct {
 	Models  map[string]ModelPricing `yaml:"models"`
 	Default *ModelPricing           `yaml:"default,omitempty"`
+}
+
+// PricingConfigMoney represents the entire pricing configuration using Money type
+type PricingConfigMoney struct {
+	Models  map[string]ModelPricingMoney
+	Default *ModelPricingMoney
 }
 
 var (
@@ -146,4 +170,106 @@ func (mp *ModelPricing) GetTierPricing(serviceTier string) (prompt, cachedPrompt
 	}
 	// Fallback to standard pricing
 	return mp.Prompt, mp.CachedPrompt, mp.Completion, "standard"
+}
+
+// ToMoney converts float64-based ModelPricing to Money-based ModelPricingMoney
+func (mp *ModelPricing) ToMoney() ModelPricingMoney {
+	result := ModelPricingMoney{
+		Prompt:       NewMoneyFromUSD(mp.Prompt / 1000000.0),
+		CachedPrompt: NewMoneyFromUSD(mp.CachedPrompt / 1000000.0),
+		Completion:   NewMoneyFromUSD(mp.Completion / 1000000.0),
+		Aliases:      mp.Aliases,
+	}
+
+	if mp.Flex != nil {
+		result.Flex = &TierPricingMoney{
+			Prompt:       NewMoneyFromUSD(mp.Flex.Prompt / 1000000.0),
+			CachedPrompt: NewMoneyFromUSD(mp.Flex.CachedPrompt / 1000000.0),
+			Completion:   NewMoneyFromUSD(mp.Flex.Completion / 1000000.0),
+		}
+	}
+
+	if mp.Priority != nil {
+		result.Priority = &TierPricingMoney{
+			Prompt:       NewMoneyFromUSD(mp.Priority.Prompt / 1000000.0),
+			CachedPrompt: NewMoneyFromUSD(mp.Priority.CachedPrompt / 1000000.0),
+			Completion:   NewMoneyFromUSD(mp.Priority.Completion / 1000000.0),
+		}
+	}
+
+	if mp.Batch != nil {
+		result.Batch = &TierPricingMoney{
+			Prompt:       NewMoneyFromUSD(mp.Batch.Prompt / 1000000.0),
+			CachedPrompt: NewMoneyFromUSD(mp.Batch.CachedPrompt / 1000000.0),
+			Completion:   NewMoneyFromUSD(mp.Batch.Completion / 1000000.0),
+		}
+	}
+
+	return result
+}
+
+// ToMoney converts float64-based PricingConfig to Money-based PricingConfigMoney
+func (cfg *PricingConfig) ToMoney() PricingConfigMoney {
+	result := PricingConfigMoney{
+		Models: make(map[string]ModelPricingMoney),
+	}
+
+	for name, pricing := range cfg.Models {
+		result.Models[name] = pricing.ToMoney()
+	}
+
+	if cfg.Default != nil {
+		defaultMoney := cfg.Default.ToMoney()
+		result.Default = &defaultMoney
+	}
+
+	return result
+}
+
+// GetTierPricingMoney returns Money-based pricing for a specific service tier
+func (mp *ModelPricingMoney) GetTierPricingMoney(serviceTier string) (prompt, cachedPrompt, completion Money, tier string) {
+	switch serviceTier {
+	case "flex":
+		if mp.Flex != nil {
+			return mp.Flex.Prompt, mp.Flex.CachedPrompt, mp.Flex.Completion, "flex"
+		}
+	case "priority":
+		if mp.Priority != nil {
+			return mp.Priority.Prompt, mp.Priority.CachedPrompt, mp.Priority.Completion, "priority"
+		}
+	case "batch":
+		if mp.Batch != nil {
+			return mp.Batch.Prompt, mp.Batch.CachedPrompt, mp.Batch.Completion, "batch"
+		}
+	}
+	// Fallback to standard pricing
+	return mp.Prompt, mp.CachedPrompt, mp.Completion, "standard"
+}
+
+// FindModelPricingMoney looks up Money-based pricing for a model
+func (cfg *PricingConfigMoney) FindModelPricingMoney(modelName string) (*ModelPricingMoney, bool) {
+	// Direct lookup first
+	if pricing, exists := cfg.Models[modelName]; exists {
+		return &pricing, true
+	}
+
+	// Check for prefix matches - find the longest matching prefix
+	var bestMatch string
+	var bestPricing *ModelPricingMoney
+
+	for configModel, pricing := range cfg.Models {
+		// Check if the input model name starts with this config model name
+		if len(configModel) > len(bestMatch) && len(modelName) >= len(configModel) &&
+			modelName[:len(configModel)] == configModel {
+			bestMatch = configModel
+			pricingCopy := pricing // Create a copy to avoid pointer issues
+			bestPricing = &pricingCopy
+		}
+	}
+
+	if bestPricing != nil {
+		return bestPricing, true
+	}
+
+	return nil, false
 }

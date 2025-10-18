@@ -551,3 +551,83 @@ func TestComputePriceMoneyWithTier(t *testing.T) {
 		t.Errorf("expected ComputePrice to use 'standard' tier, got '%s'", res.ServiceTier)
 	}
 }
+
+func TestPricing_SmallestTokenAccumulation(t *testing.T) {
+	// Test precision with the smallest possible per-token cost and many small calculations
+	// This demonstrates that integer arithmetic maintains perfect precision where floats would fail
+
+	// Create a model with extremely small per-token pricing
+	smallestPricePerMillion := 0.0001 // $0.0001 per million tokens = $0.0000000001 per token
+	testConfig := &PricingConfig{
+		Models: map[string]ModelPricing{
+			"micro-model": {
+				Prompt:       smallestPricePerMillion,
+				CachedPrompt: smallestPricePerMillion / 10, // Even smaller
+				Completion:   smallestPricePerMillion * 2,
+			},
+		},
+	}
+	SetConfig(testConfig)
+	defer ResetConfig()
+
+	// Test 1: Many single-token calculations should sum to the same as one bulk calculation
+	iterations := 10000
+	var accumulatedTotal Money
+
+	// Calculate cost for 1 token, 'iterations' times
+	for i := 0; i < iterations; i++ {
+		usage := Usage{PromptTokens: 1, CompletionTokens: 0}
+		result, err := ComputePriceMoney("micro-model", usage)
+		if err != nil {
+			t.Fatalf("calculation failed: %v", err)
+		}
+		accumulatedTotal = accumulatedTotal.Add(result.TotalCost)
+	}
+
+	// Calculate cost for 'iterations' tokens in one go
+	bulkUsage := Usage{PromptTokens: iterations, CompletionTokens: 0}
+	bulkResult, err := ComputePriceMoney("micro-model", bulkUsage)
+	if err != nil {
+		t.Fatalf("bulk calculation failed: %v", err)
+	}
+
+	// They should be exactly equal with integer arithmetic
+	if accumulatedTotal != bulkResult.TotalCost {
+		t.Errorf("Precision loss detected!")
+		t.Errorf("  %d × 1-token calculations: %s", iterations, accumulatedTotal.String())
+		t.Errorf("  1 × %d-token calculation:   %s", iterations, bulkResult.TotalCost.String())
+		t.Errorf("  Difference: %d nano-cents", int64(accumulatedTotal-bulkResult.TotalCost))
+	} else {
+		t.Logf("✅ Perfect precision maintained:")
+		t.Logf("  %d × 1-token calculations: %s", iterations, accumulatedTotal.String())
+		t.Logf("  1 × %d-token calculation:   %s", iterations, bulkResult.TotalCost.String())
+	}
+
+	// Test 2: Compare with what float64 arithmetic would produce
+	// Simulate the old buggy behavior with float64
+	pricePerToken := smallestPricePerMillion / 1000000.0 // Convert to per-token
+
+	var floatAccumulated float64
+	for i := 0; i < iterations; i++ {
+		floatAccumulated += pricePerToken // 1 token each time
+	}
+
+	floatBulk := pricePerToken * float64(iterations) // All tokens at once
+	floatDiff := floatAccumulated - floatBulk
+
+	t.Logf("Float64 comparison:")
+	t.Logf("  %d × 1-token calculations: $%.15f", iterations, floatAccumulated)
+	t.Logf("  1 × %d-token calculation:   $%.15f", iterations, floatBulk)
+	t.Logf("  Float64 difference:        %e", floatDiff)
+	t.Logf("  Money difference:          %d nano-cents (perfect: 0)", int64(accumulatedTotal-bulkResult.TotalCost))
+
+	// Test 3: Verify extremely small individual costs maintain precision
+	singleTokenCost := accumulatedTotal.ToUSD() / float64(iterations)
+	expectedSingleCost := smallestPricePerMillion / 1000000.0
+
+	if !almostEqual(singleTokenCost, expectedSingleCost) {
+		t.Errorf("Single token cost precision lost: got %.15f, want %.15f", singleTokenCost, expectedSingleCost)
+	}
+
+	t.Logf("Single token cost: $%.15f (expected: $%.15f)", singleTokenCost, expectedSingleCost)
+}

@@ -34,6 +34,57 @@ func TestMoney_Precision(t *testing.T) {
 	}
 }
 
+func TestMoney_SmallestUnitAccumulation(t *testing.T) {
+	// Test that we can accumulate the smallest possible monetary unit without losing precision
+	// This demonstrates the advantage of integer arithmetic over floating-point
+
+	// The smallest unit is 1 nano cent = 1/MonetaryUnit USD = 1/10,000,000,000 USD
+	smallestUnit := Money(1)            // 1 nano cent
+	smallestUSD := smallestUnit.ToUSD() // Should be 0.0000000001 USD
+
+	t.Logf("Smallest unit: %s (%.10f USD)", smallestUnit.String(), smallestUSD)
+
+	// Accumulate 1 billion smallest units - should equal exactly $0.10
+	iterations := 1_000_000_000
+	var total Money
+
+	for i := 0; i < iterations; i++ {
+		total = total.Add(smallestUnit)
+	}
+
+	expected := NewMoneyFromUSD(0.1) // Should be exactly $0.10
+
+	if total != expected {
+		t.Errorf("Smallest unit accumulation failed: got %s, want %s", total.String(), expected.String())
+		t.Errorf("Got: %d nano cents, Want: %d nano cents", int64(total), int64(expected))
+	}
+
+	// Verify the exact USD conversion
+	totalUSD := total.ToUSD()
+	if totalUSD != 0.1 {
+		t.Errorf("USD conversion failed: got %.10f, want 0.1000000000", totalUSD)
+	}
+
+	t.Logf("✅ Perfect precision: %d × %s = %s", iterations, smallestUnit.String(), total.String())
+
+	// Compare with equivalent float64 arithmetic to show the difference
+	var floatTotal float64
+	smallestFloat := 0.0000000001 // 1/10,000,000,000
+
+	for i := 0; i < iterations; i++ {
+		floatTotal += smallestFloat
+	}
+
+	floatDiff := math.Abs(floatTotal - 0.1)
+	t.Logf("Float64 result: %.10f (difference from 0.1: %e)", floatTotal, floatDiff)
+
+	if floatDiff > 0 {
+		t.Logf("✅ Money type maintains perfect precision while float64 loses precision")
+	} else {
+		t.Logf("⚠️  Float64 surprisingly maintained precision in this case")
+	}
+}
+
 func TestMoney_Arithmetic(t *testing.T) {
 	money1 := NewMoneyFromUSD(10.5)
 	money2 := NewMoneyFromUSD(5.25)

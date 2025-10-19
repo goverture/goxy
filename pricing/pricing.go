@@ -16,45 +16,16 @@ type Usage struct {
 	TotalTokens        int `json:"total_tokens"`
 }
 
-// PriceResult holds the computed pricing info.
-type PriceResult struct {
-	Model             Model
-	ServiceTier       string
-	PromptTokens      int
-	CompletionTokens  int
-	PromptCostUSD     float64
-	CompletionCostUSD float64
-	TotalCostUSD      float64
-	Note              string
-}
-
-// getPricing returns the pricing for a given model and service tier from configuration
-func getPricing(model Model, serviceTier string) (struct{ Prompt, CachedPrompt, Completion float64 }, string, error) {
-	cfg, err := GetConfig()
-	if err != nil {
-		return struct{ Prompt, CachedPrompt, Completion float64 }{}, "standard", fmt.Errorf("failed to load pricing config: %w", err)
-	}
-
-	pricing, found := cfg.FindModelPricing(string(model))
-	if found {
-		prompt, cachedPrompt, completion, actualTier := pricing.GetTierPricing(serviceTier)
-		return struct{ Prompt, CachedPrompt, Completion float64 }{
-			Prompt:       prompt,
-			CachedPrompt: cachedPrompt,
-			Completion:   completion,
-		}, actualTier, nil
-	}
-
-	// Fallback to default if configured
-	if cfg.Default != nil {
-		return struct{ Prompt, CachedPrompt, Completion float64 }{
-			Prompt:       cfg.Default.Prompt,
-			CachedPrompt: cfg.Default.CachedPrompt,
-			Completion:   cfg.Default.Completion,
-		}, "standard", nil
-	}
-
-	return struct{ Prompt, CachedPrompt, Completion float64 }{}, "standard", fmt.Errorf("no pricing found for model %s", model)
+// PriceResultMoney holds the computed pricing info using Money type for precision.
+type PriceResultMoney struct {
+	Model            Model
+	ServiceTier      string
+	PromptTokens     int
+	CompletionTokens int
+	PromptCost       Money
+	CompletionCost   Money
+	TotalCost        Money
+	Note             string
 }
 
 // resolveModelName determines the canonical model name to use for pricing lookup.
@@ -92,18 +63,52 @@ func resolveModelName(raw string) string {
 	return raw
 }
 
-// ComputePrice calculates cost given usage and model (using standard pricing).
-func ComputePrice(modelRaw string, u Usage) (PriceResult, error) {
-	return ComputePriceWithTier(modelRaw, u, "standard")
+// getPricingMoney returns the Money-based pricing for a given model and service tier from configuration
+func getPricingMoney(model Model, serviceTier string) (prompt, cachedPrompt, completion Money, actualTier string, err error) {
+	cfg, configErr := GetConfig()
+	if configErr != nil {
+		return Money(0), Money(0), Money(0), "standard", fmt.Errorf("failed to load pricing config: %w", configErr)
+	}
+
+	cfgMoney := cfg.ToMoney()
+	pricing, found := cfgMoney.FindModelPricingMoney(string(model))
+	if found {
+		prompt, cachedPrompt, completion, actualTier := pricing.GetTierPricingMoney(serviceTier)
+		return prompt, cachedPrompt, completion, actualTier, nil
+	}
+
+	// Fallback to default if configured
+	if cfgMoney.Default != nil {
+		prompt, cachedPrompt, completion, _ := cfgMoney.Default.GetTierPricingMoney(serviceTier)
+		return prompt, cachedPrompt, completion, "standard", nil
+	}
+
+	return Money(0), Money(0), Money(0), "standard", fmt.Errorf("no pricing found for model %s", model)
 }
 
-// ComputePriceWithTier calculates cost given usage, model, and service tier.
-func ComputePriceWithTier(modelRaw string, u Usage, serviceTier string) (PriceResult, error) {
+// ComputePriceMoney calculates cost given usage and model (using standard pricing) with Money precision.
+// This is the recommended function for new code that needs precise monetary calculations.
+func ComputePriceMoney(modelRaw string, u Usage) (PriceResultMoney, error) {
+	return ComputePriceMoneyWithTier(modelRaw, u, "standard")
+}
+
+// CalculatePrice is an alias for ComputePriceMoney - the preferred way to calculate prices.
+func CalculatePrice(modelRaw string, u Usage) (PriceResultMoney, error) {
+	return ComputePriceMoney(modelRaw, u)
+}
+
+// CalculatePriceWithTier is an alias for ComputePriceMoneyWithTier - the preferred way to calculate prices with tiers.
+func CalculatePriceWithTier(modelRaw string, u Usage, serviceTier string) (PriceResultMoney, error) {
+	return ComputePriceMoneyWithTier(modelRaw, u, serviceTier)
+}
+
+// ComputePriceMoneyWithTier calculates cost given usage, model, and service tier using Money precision.
+func ComputePriceMoneyWithTier(modelRaw string, u Usage, serviceTier string) (PriceResultMoney, error) {
 	modelName := resolveModelName(modelRaw)
 	m := Model(modelName)
-	tiers, actualTier, err := getPricing(m, serviceTier)
+	promptPrice, cachedPromptPrice, completionPrice, actualTier, err := getPricingMoney(m, serviceTier)
 	if err != nil {
-		return PriceResult{
+		return PriceResultMoney{
 			Model:            m,
 			ServiceTier:      serviceTier,
 			PromptTokens:     u.PromptTokens,
@@ -118,7 +123,7 @@ func ComputePriceWithTier(modelRaw string, u Usage, serviceTier string) (PriceRe
 	}
 
 	// Calculate prompt cost: split between cached and non-cached tokens
-	var ptCost float64
+	var ptCost Money
 	if u.PromptCachedTokens > 0 {
 		cached := u.PromptCachedTokens
 		if cached > u.PromptTokens {
@@ -126,38 +131,40 @@ func ComputePriceWithTier(modelRaw string, u Usage, serviceTier string) (PriceRe
 		}
 		nonCachedTokens := u.PromptTokens - cached
 
-		// Use actual cached prompt pricing from config
-		nonCachedCost := (float64(nonCachedTokens) / 1000000.0) * tiers.Prompt
-		cachedCost := (float64(cached) / 1000000.0) * tiers.CachedPrompt
-		ptCost = nonCachedCost + cachedCost
+		// Use precise Money arithmetic
+		nonCachedCost := promptPrice.Multiply(float64(nonCachedTokens))
+		cachedCost := cachedPromptPrice.Multiply(float64(cached))
+		ptCost = nonCachedCost.Add(cachedCost)
 	} else {
 		// All prompt tokens are regular (non-cached)
-		ptCost = (float64(u.PromptTokens) / 1000000.0) * tiers.Prompt
+		ptCost = promptPrice.Multiply(float64(u.PromptTokens))
 	}
 
-	ctCost := (float64(u.CompletionTokens) / 1000000.0) * tiers.Completion
-	total := ptCost + ctCost
+	ctCost := completionPrice.Multiply(float64(u.CompletionTokens))
+	total := ptCost.Add(ctCost)
 
 	note := "prices loaded from config; verify against https://openai.com/api/pricing/"
 	if actualTier != "standard" {
 		note += fmt.Sprintf(" (using %s tier pricing)", actualTier)
 	}
 	if u.PromptCachedTokens > 0 {
-		note += fmt.Sprintf(" (includes cached prompt token pricing)")
+		note += " (includes cached prompt token pricing)"
 	}
 
-	return PriceResult{
-		Model:             m,
-		ServiceTier:       actualTier,
-		PromptTokens:      u.PromptTokens,
-		CompletionTokens:  u.CompletionTokens,
-		PromptCostUSD:     ptCost,
-		CompletionCostUSD: ctCost,
-		TotalCostUSD:      total,
-		Note:              note,
+	return PriceResultMoney{
+		Model:            m,
+		ServiceTier:      actualTier,
+		PromptTokens:     u.PromptTokens,
+		CompletionTokens: u.CompletionTokens,
+		PromptCost:       ptCost,
+		CompletionCost:   ctCost,
+		TotalCost:        total,
+		Note:             note,
 	}, nil
 }
 
-func (pr PriceResult) String() string {
-	return fmt.Sprintf("[pricing] model=%s tier=%s prompt=%d completion=%d cost_prompt=$%.6f cost_completion=$%.6f total=$%.6f", pr.Model, pr.ServiceTier, pr.PromptTokens, pr.CompletionTokens, pr.PromptCostUSD, pr.CompletionCostUSD, pr.TotalCostUSD)
+func (pr PriceResultMoney) String() string {
+	return fmt.Sprintf("[pricing] model=%s tier=%s prompt=%d completion=%d cost_prompt=%s cost_completion=%s total=%s",
+		pr.Model, pr.ServiceTier, pr.PromptTokens, pr.CompletionTokens,
+		pr.PromptCost.String(), pr.CompletionCost.String(), pr.TotalCost.String())
 }

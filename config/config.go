@@ -1,6 +1,10 @@
 package config
 
 import (
+	"fmt"
+	"os"
+
+	"github.com/goverture/goxy/pricing"
 	"github.com/spf13/pflag"
 )
 
@@ -33,6 +37,21 @@ func ParseConfig() *Config {
 	if showVersion {
 		// Version info will be set during build via -ldflags
 		println("GoXY version:", Version)
+		os.Exit(0)
+	}
+
+	// Validate spend limit against maximum representable money amount
+	if cfg.SpendLimitPerHour > 0 && cfg.SpendLimitPerHour > pricing.MaxMoneyUSD() {
+		fmt.Fprintf(os.Stderr, "Error: spend-limit-per-hour (%.2f) exceeds maximum representable amount (%.2f USD)\n",
+			cfg.SpendLimitPerHour, pricing.MaxMoneyUSD())
+		os.Exit(1)
+	}
+
+	// Validate spend limit against minimum representable money amount
+	if cfg.SpendLimitPerHour > 0 && cfg.SpendLimitPerHour < pricing.MinMoneyUSD() {
+		fmt.Fprintf(os.Stderr, "Error: spend-limit-per-hour (%.15f) is below minimum representable amount (%.15f USD)\n",
+			cfg.SpendLimitPerHour, pricing.MinMoneyUSD())
+		os.Exit(1)
 	}
 
 	return cfg

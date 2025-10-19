@@ -28,8 +28,8 @@ func main() {
 	// Print the config
 	log.Printf("Config: %+v", config.Cfg)
 
-	// Create limit manager
-	limitMgr := pricing.NewManager(config.Cfg.SpendLimitPerHour)
+	// Create limit manager using the new Money-based API
+	limitMgr := pricing.NewLimitManager(config.Cfg.SpendLimitPerHour)
 
 	// Create proxy handler and admin handler
 	proxyHandler := handlers.NewProxyHandler(limitMgr)

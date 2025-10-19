@@ -11,6 +11,16 @@ import (
 // This constant can be easily changed to adjust precision.
 const MonetaryUnit = 10_000_000_000 // 1 USD = 10,000,000,000 nano cents
 
+// MaxMoney represents the maximum representable monetary value.
+// With int64 and MonetaryUnit=10^10, this is approximately $922,337,203.68
+const MaxMoney Money = math.MaxInt64
+
+// MaxMoneyUSD returns the maximum representable USD amount as a float64.
+// This is approximately $922,337,203.68
+func MaxMoneyUSD() float64 {
+	return float64(MaxMoney) / MonetaryUnit
+}
+
 // Money represents a monetary amount in nano cents (integer-based for precision)
 type Money int64
 

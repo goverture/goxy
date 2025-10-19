@@ -152,3 +152,33 @@ func TestMoney_Accumulation_Precision(t *testing.T) {
 		t.Logf("Money maintained exact precision: %s", total.String())
 	}
 }
+
+func TestMaxMoney(t *testing.T) {
+	// Test that MaxMoney constants are correct
+	expectedMaxUSD := float64(math.MaxInt64) / MonetaryUnit
+	actualMaxUSD := MaxMoneyUSD()
+
+	if actualMaxUSD != expectedMaxUSD {
+		t.Errorf("MaxMoneyUSD() mismatch: got %.10f, want %.10f", actualMaxUSD, expectedMaxUSD)
+	}
+
+	t.Logf("Maximum representable amount: $%.2f", actualMaxUSD)
+	t.Logf("Maximum Money value: %d nano-cents", int64(MaxMoney))
+
+	// Test that we can actually create and use MaxMoney
+	maxMoney := MaxMoney
+	if maxMoney.ToUSD() != expectedMaxUSD {
+		t.Errorf("MaxMoney.ToUSD() mismatch: got %.10f, want %.10f", maxMoney.ToUSD(), expectedMaxUSD)
+	}
+
+	// Test that trying to create money beyond max would overflow (conceptually)
+	// We can't easily test overflow since NewMoneyFromUSD uses math.Round
+	// But we can verify the MaxMoneyUSD value is reasonable
+	if actualMaxUSD < 900_000_000 {
+		t.Errorf("MaxMoneyUSD seems too small: %.2f (expected > 900 million)", actualMaxUSD)
+	}
+
+	if actualMaxUSD > 1_000_000_000 {
+		t.Errorf("MaxMoneyUSD seems too large: %.2f (expected < 1 billion)", actualMaxUSD)
+	}
+}

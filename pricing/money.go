@@ -15,10 +15,20 @@ const MonetaryUnit = 10_000_000_000 // 1 USD = 10,000,000,000 nano cents
 // With int64 and MonetaryUnit=10^10, this is approximately $922,337,203.68
 const MaxMoney Money = math.MaxInt64
 
+// MinMoney represents the minimum positive representable monetary value.
+// This is 1 nano cent = $0.0000000001
+const MinMoney Money = 1
+
 // MaxMoneyUSD returns the maximum representable USD amount as a float64.
 // This is approximately $922,337,203.68
 func MaxMoneyUSD() float64 {
 	return float64(MaxMoney) / MonetaryUnit
+}
+
+// MinMoneyUSD returns the minimum positive representable USD amount as a float64.
+// This is exactly $0.0000000001 (1 nano cent)
+func MinMoneyUSD() float64 {
+	return float64(MinMoney) / MonetaryUnit
 }
 
 // Money represents a monetary amount in nano cents (integer-based for precision)

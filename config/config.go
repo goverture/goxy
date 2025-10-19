@@ -47,5 +47,12 @@ func ParseConfig() *Config {
 		os.Exit(1)
 	}
 
+	// Validate spend limit against minimum representable money amount
+	if cfg.SpendLimitPerHour > 0 && cfg.SpendLimitPerHour < pricing.MinMoneyUSD() {
+		fmt.Fprintf(os.Stderr, "Error: spend-limit-per-hour (%.15f) is below minimum representable amount (%.15f USD)\n",
+			cfg.SpendLimitPerHour, pricing.MinMoneyUSD())
+		os.Exit(1)
+	}
+
 	return cfg
 }

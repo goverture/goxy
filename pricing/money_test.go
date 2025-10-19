@@ -182,3 +182,47 @@ func TestMaxMoney(t *testing.T) {
 		t.Errorf("MaxMoneyUSD seems too large: %.2f (expected < 1 billion)", actualMaxUSD)
 	}
 }
+
+func TestMinMoney(t *testing.T) {
+	// Test that MinMoney constants are correct
+	expectedMinUSD := float64(1) / MonetaryUnit // 1 nano cent
+	actualMinUSD := MinMoneyUSD()
+
+	if actualMinUSD != expectedMinUSD {
+		t.Errorf("MinMoneyUSD() mismatch: got %.15f, want %.15f", actualMinUSD, expectedMinUSD)
+	}
+
+	t.Logf("Minimum representable amount: $%.15f", actualMinUSD)
+	t.Logf("Minimum Money value: %d nano-cents", int64(MinMoney))
+
+	// Test that we can actually create and use MinMoney
+	minMoney := MinMoney
+	if minMoney.ToUSD() != expectedMinUSD {
+		t.Errorf("MinMoney.ToUSD() mismatch: got %.15f, want %.15f", minMoney.ToUSD(), expectedMinUSD)
+	}
+
+	// Verify MinMoney is exactly 1 nano cent
+	if MinMoney != 1 {
+		t.Errorf("MinMoney should be 1 nano cent, got %d", int64(MinMoney))
+	}
+
+	// Test that MinMoney is the smallest positive value we can represent
+	expectedValue := 0.0000000001 // 1/10^10
+	if actualMinUSD != expectedValue {
+		t.Errorf("MinMoneyUSD should be exactly %.15f, got %.15f", expectedValue, actualMinUSD)
+	}
+
+	// Test precision: adding MinMoney many times should work correctly
+	var accumulated Money
+	iterations := 1000
+	for i := 0; i < iterations; i++ {
+		accumulated = accumulated.Add(MinMoney)
+	}
+
+	expectedAccumulated := MinMoney.Multiply(float64(iterations))
+	if accumulated != expectedAccumulated {
+		t.Errorf("MinMoney accumulation failed: got %d, want %d", int64(accumulated), int64(expectedAccumulated))
+	}
+
+	t.Logf("✅ Successfully accumulated %d × MinMoney = %s", iterations, accumulated.String())
+}

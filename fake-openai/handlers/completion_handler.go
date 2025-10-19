@@ -123,13 +123,13 @@ func HandleChatCompletions(w http.ResponseWriter, r *http.Request) {
 				FinishReason: "stop",
 			},
 		},
-		ServiceTier:       "standard",
+		ServiceTier:       "flex",
 		SystemFingerprint: "fp_fake12345",
 	}
 
 	// Set realistic token usage based on model
-	promptTokens := 0 // estimateTokens(userContent) + 10 // Add some system tokens
-	completionTokens := 0 // estimateTokens(response.Choices[0].Message.Content)
+	promptTokens := 2     // estimateTokens(userContent) + 10 // Add some system tokens
+	completionTokens := 1 // estimateTokens(response.Choices[0].Message.Content)
 
 	response.Usage.PromptTokens = promptTokens
 	response.Usage.CompletionTokens = completionTokens

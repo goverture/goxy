@@ -34,22 +34,19 @@ func maskAPIKey(key string) string {
 
 // AdminHandler provides endpoints for monitoring usage and updating limits
 type AdminHandler struct {
-	manager *pricing.ManagerMoney
+	manager pricing.LimitManager
 }
 
 // NewAdminHandler creates a new admin handler with the given limit manager
-func NewAdminHandler(manager *pricing.ManagerMoney) *AdminHandler {
+func NewAdminHandler(manager pricing.LimitManager) *AdminHandler {
 	return &AdminHandler{manager: manager}
 }
 
 // UsageResponse represents the response for usage queries
-// Uses legacy UsageInfo for JSON compatibility
 type UsageResponse struct {
-	Usage []pricing.UsageInfo `json:"usage"`
-	Total int                 `json:"total"`
-}
-
-// LimitUpdateRequest represents the request to update spending limits
+	Usage []pricing.UsageInfoMoney `json:"usage"`
+	Total int                      `json:"total"`
+} // LimitUpdateRequest represents the request to update spending limits
 type LimitUpdateRequest struct {
 	LimitUSD float64 `json:"limit_usd"`
 }
@@ -103,13 +100,11 @@ func (ah *AdminHandler) handleUsage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return usage for all keys (no individual key queries for security)
-	usageMoney := ah.manager.GetAllUsage()
+	usage := ah.manager.GetAllUsage()
 
-	// Convert to legacy format for JSON compatibility and mask keys for security
-	usage := make([]pricing.UsageInfo, len(usageMoney))
-	for i := range usageMoney {
-		usageMoney[i].Key = maskAPIKey(usageMoney[i].Key)
-		usage[i] = usageMoney[i].ToLegacy()
+	// Mask keys for security
+	for i := range usage {
+		usage[i].Key = maskAPIKey(usage[i].Key)
 	}
 
 	response := UsageResponse{

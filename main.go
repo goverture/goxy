@@ -1,14 +1,18 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/goverture/goxy/config"
 	"github.com/goverture/goxy/handlers"
-	"github.com/goverture/goxy/pricing"
+	"github.com/goverture/goxy/persistence"
 )
 
 var (
@@ -28,8 +32,13 @@ func main() {
 	// Print the config
 	log.Printf("Config: %+v", config.Cfg)
 
-	// Create limit manager using the new Money-based API
-	limitMgr := pricing.NewLimitManager(config.Cfg.SpendLimitPerHour)
+	// Create persistent limit manager with SQLite database
+	dbPath := "goxy_usage.db" // Store in current directory
+	limitMgr, err := persistence.NewPersistentLimitManager(config.Cfg.SpendLimitPerHour, dbPath)
+	if err != nil {
+		log.Fatalf("Failed to create persistent limit manager: %v", err)
+	}
+	defer limitMgr.Close()
 
 	// Create proxy handler and admin handler
 	proxyHandler := handlers.NewProxyHandler(limitMgr)
@@ -61,6 +70,10 @@ func main() {
 	log.Printf("Proxying to %s on %s", config.Cfg.OpenAIBaseURL, srv.Addr)
 	log.Printf("Admin API listening on %s", adminSrv.Addr)
 
+	// Set up graceful shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
 	// Start admin server in background
 	go func() {
 		if err := adminSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -68,8 +81,25 @@ func main() {
 		}
 	}()
 
-	// Start main proxy server (blocking)
-	log.Fatal(srv.ListenAndServe())
+	// Start main proxy server in background
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Proxy server failed: %v", err)
+		}
+	}()
+
+	// Wait for shutdown signal
+	<-quit
+	log.Println("Shutting down servers...")
+
+	// Graceful shutdown (limited time)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	srv.Shutdown(ctx)
+	adminSrv.Shutdown(ctx)
+
+	log.Println("Servers stopped.")
 }
 
 // itoa is a minimal int to string conversion for port formatting

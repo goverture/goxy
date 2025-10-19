@@ -9,6 +9,7 @@ Lightweight **OpenAI API proxy** with **spending limits**. Drop it in front of y
 - [x] Hourly spending limit (once exceeded the proxy will return 429)
 - [x] Admin port (view/update limit and usage)
 - [x] Support for flex/priority service level pricing
+- [x] Persistence across restart
 - [ ] Support for streaming requests (currently only synchronous requests are supported)
 
 ## Supported endpoints

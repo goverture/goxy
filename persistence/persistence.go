@@ -192,6 +192,7 @@ func (p *PersistentLimitManager) AddCost(key string, delta pricing.Money) {
 	p.AddCostWithMaskedKey(key, "", delta)
 }
 
+// TODO: Are we at least locking properly here ?
 // AddCostWithMaskedKey adds cost and saves to database with both hashed and masked keys
 func (p *PersistentLimitManager) AddCostWithMaskedKey(key string, maskedKey string, delta pricing.Money) {
 	// First update in-memory state

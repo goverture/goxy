@@ -132,6 +132,7 @@ func ComputePriceMoneyWithTier(modelRaw string, u Usage, serviceTier string) (Pr
 		nonCachedTokens := u.PromptTokens - cached
 
 		// Use precise Money arithmetic
+		// TODO: Why are we using float64 then !
 		nonCachedCost := promptPrice.Multiply(float64(nonCachedTokens))
 		cachedCost := cachedPromptPrice.Multiply(float64(cached))
 		ptCost = nonCachedCost.Add(cachedCost)

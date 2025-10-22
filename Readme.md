@@ -48,7 +48,7 @@ Then point your app to `http://localhost:8080`.
 curl -v http://localhost:8080/v1/chat/completions \
   -H "Authorization: Bearer $OPENAI_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"model":"gpt-4o","messages":[{"role":"user","content":"What is the capital of France?"}]}'
+  -d '{"model":"gpt-5-nano","messages":[{"role":"user","content":"What is the capital of France?"}]}'
 
 # Responses API
 curl http://localhost:8080/v1/responses \

@@ -5,62 +5,29 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/goverture/goxy/persistence"
 	"github.com/goverture/goxy/pricing"
 )
 
-func TestMaskAPIKey(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{
-			name:     "Bearer token with sk- prefix",
-			input:    "Bearer sk-1234567890abcdef1234567890abcdef",
-			expected: "Bearer sk-1...cdef",
-		},
-		{
-			name:     "Bearer token short",
-			input:    "Bearer sk-123",
-			expected: "Bearer sk-1...",
-		},
-		{
-			name:     "Raw token",
-			input:    "sk-1234567890abcdef1234567890abcdef",
-			expected: "sk-1...cdef",
-		},
-		{
-			name:     "Short raw token",
-			input:    "sk-123",
-			expected: "sk-1...",
-		},
-		{
-			name:     "Anonymous key",
-			input:    "anonymous",
-			expected: "anonymous",
-		},
-		{
-			name:     "Empty key",
-			input:    "",
-			expected: "",
-		},
-	}
+// createTestManager creates a persistent limit manager for testing
+func createTestManager(t *testing.T, limitUSD float64) *persistence.PersistentLimitManager {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test.db")
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := maskAPIKey(tt.input)
-			if result != tt.expected {
-				t.Errorf("maskAPIKey(%q) = %q, want %q", tt.input, result, tt.expected)
-			}
-		})
+	mgr, err := persistence.NewPersistentLimitManagerQuiet(limitUSD, dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create test persistent manager: %v", err)
 	}
+	return mgr
 }
 
 func TestAdminHandler_HealthCheck(t *testing.T) {
-	mgr := pricing.NewManagerMoneyFromUSD(2.0)
+	mgr := createTestManager(t, 2.0)
+	defer mgr.Close()
 	adminHandler := NewAdminHandler(mgr)
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
@@ -87,7 +54,8 @@ func TestAdminHandler_HealthCheck(t *testing.T) {
 }
 
 func TestAdminHandler_HealthCheck_WrongMethod(t *testing.T) {
-	mgr := pricing.NewManagerMoneyFromUSD(2.0)
+	mgr := createTestManager(t, 2.0)
+	defer mgr.Close()
 	adminHandler := NewAdminHandler(mgr)
 
 	req := httptest.NewRequest(http.MethodPost, "/health", nil)
@@ -101,7 +69,8 @@ func TestAdminHandler_HealthCheck_WrongMethod(t *testing.T) {
 }
 
 func TestAdminHandler_GetUsage_EmptyUsage(t *testing.T) {
-	mgr := pricing.NewManagerMoneyFromUSD(2.0)
+	mgr := createTestManager(t, 2.0)
+	defer mgr.Close()
 	adminHandler := NewAdminHandler(mgr)
 
 	req := httptest.NewRequest(http.MethodGet, "/usage", nil)
@@ -128,18 +97,22 @@ func TestAdminHandler_GetUsage_EmptyUsage(t *testing.T) {
 }
 
 func TestAdminHandler_GetUsage_WithMaskedKeys(t *testing.T) {
-	mgr := pricing.NewManagerMoneyFromUSD(2.0)
+	mgr := createTestManager(t, 2.0)
+	defer mgr.Close()
 	adminHandler := NewAdminHandler(mgr)
 
-	// Simulate some usage by adding cost for different keys
-	testKeys := []string{
-		"Bearer sk-1234567890abcdef1234567890abcdef",
-		"Bearer sk-9876543210fedcba9876543210fedcba",
-		"anonymous",
+	// Simulate some usage by adding cost for different keys with proper masking
+	testKeys := []struct {
+		raw    string
+		masked string
+	}{
+		{"Bearer sk-1234567890abcdef1234567890abcdef", "Bearer sk-1...cdef"},
+		{"Bearer sk-9876543210fedcba9876543210fedcba", "Bearer sk-9...dcba"},
+		{"anonymous", "anonymous"},
 	}
 
 	for _, key := range testKeys {
-		mgr.AddCost(key, pricing.NewMoneyFromUSD(0.1))
+		mgr.AddCostWithMaskedKey(key.raw, key.masked, pricing.NewMoneyFromUSD(0.1))
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/usage", nil)
@@ -162,11 +135,12 @@ func TestAdminHandler_GetUsage_WithMaskedKeys(t *testing.T) {
 
 	// Check that keys are properly masked
 	for _, usage := range response.Usage {
+		// Check that raw key values are not exposed
 		if strings.Contains(usage.Key, "1234567890abcdef") || strings.Contains(usage.Key, "9876543210fedcba") {
 			t.Errorf("API key not properly masked: %s", usage.Key)
 		}
 
-		// Check that Bearer tokens are masked correctly
+		// Check that Bearer tokens are masked correctly (should contain "...")
 		if strings.HasPrefix(usage.Key, "Bearer sk-") && usage.Key != "anonymous" {
 			if !strings.Contains(usage.Key, "...") {
 				t.Errorf("Bearer token not properly masked: %s", usage.Key)
@@ -176,7 +150,8 @@ func TestAdminHandler_GetUsage_WithMaskedKeys(t *testing.T) {
 }
 
 func TestAdminHandler_GetUsage_WrongMethod(t *testing.T) {
-	mgr := pricing.NewManagerMoneyFromUSD(2.0)
+	mgr := createTestManager(t, 2.0)
+	defer mgr.Close()
 	adminHandler := NewAdminHandler(mgr)
 
 	req := httptest.NewRequest(http.MethodPost, "/usage", nil)
@@ -199,7 +174,8 @@ func TestAdminHandler_GetUsage_WrongMethod(t *testing.T) {
 }
 
 func TestAdminHandler_UpdateLimit_Success(t *testing.T) {
-	mgr := pricing.NewManagerMoneyFromUSD(2.0)
+	mgr := createTestManager(t, 2.0)
+	defer mgr.Close()
 	adminHandler := NewAdminHandler(mgr)
 
 	requestBody := LimitUpdateRequest{LimitUSD: 5.0}
@@ -240,7 +216,8 @@ func TestAdminHandler_UpdateLimit_Success(t *testing.T) {
 }
 
 func TestAdminHandler_UpdateLimit_InvalidJSON(t *testing.T) {
-	mgr := pricing.NewManagerMoneyFromUSD(2.0)
+	mgr := createTestManager(t, 2.0)
+	defer mgr.Close()
 	adminHandler := NewAdminHandler(mgr)
 
 	req := httptest.NewRequest("PUT", "/limit", bytes.NewBufferString("{invalid json}"))
@@ -264,7 +241,8 @@ func TestAdminHandler_UpdateLimit_InvalidJSON(t *testing.T) {
 }
 
 func TestAdminHandler_UpdateLimit_WrongMethod(t *testing.T) {
-	mgr := pricing.NewManagerMoneyFromUSD(2.0)
+	mgr := createTestManager(t, 2.0)
+	defer mgr.Close()
 	adminHandler := NewAdminHandler(mgr)
 
 	req := httptest.NewRequest(http.MethodGet, "/limit", nil)
@@ -287,7 +265,8 @@ func TestAdminHandler_UpdateLimit_WrongMethod(t *testing.T) {
 }
 
 func TestAdminHandler_ServeHTTP_NotFoundEndpoint(t *testing.T) {
-	mgr := pricing.NewManagerMoneyFromUSD(2.0)
+	mgr := createTestManager(t, 2.0)
+	defer mgr.Close()
 	adminHandler := NewAdminHandler(mgr)
 
 	req := httptest.NewRequest(http.MethodGet, "/nonexistent", nil)
@@ -314,7 +293,8 @@ func TestAdminHandler_ServeHTTP_NotFoundEndpoint(t *testing.T) {
 }
 
 func TestAdminHandler_ServeHTTP_OptionsRequest(t *testing.T) {
-	mgr := pricing.NewManagerMoneyFromUSD(2.0)
+	mgr := createTestManager(t, 2.0)
+	defer mgr.Close()
 	adminHandler := NewAdminHandler(mgr)
 
 	req := httptest.NewRequest(http.MethodOptions, "/usage", nil)
@@ -338,7 +318,8 @@ func TestAdminHandler_ServeHTTP_OptionsRequest(t *testing.T) {
 }
 
 func TestAdminHandler_ServeHTTP_CORSHeaders(t *testing.T) {
-	mgr := pricing.NewManagerMoneyFromUSD(2.0)
+	mgr := createTestManager(t, 2.0)
+	defer mgr.Close()
 	adminHandler := NewAdminHandler(mgr)
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)

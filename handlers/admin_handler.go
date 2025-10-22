@@ -3,49 +3,17 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-	"strings"
 
 	"github.com/goverture/goxy/pricing"
 )
 
-// maskAPIKey formats a key for display in admin responses
-// For already-masked keys, returns as-is
-// For raw keys (fallback), provides traditional masking
-func maskAPIKey(key string) string {
-	if key == "" || key == "anonymous" {
-		return key
-	}
-
-	// If it already looks masked (contains "..."), return as-is
-	if strings.Contains(key, "...") {
-		return key
-	}
-
-	// Handle "Bearer " prefix (legacy for non-hashed keys)
-	if len(key) > 7 && key[:7] == "Bearer " {
-		token := key[7:] // Remove "Bearer " prefix
-		if len(token) <= 8 {
-			// Too short to mask meaningfully
-			return "Bearer " + token[:4] + "..."
-		}
-		return "Bearer " + token[:4] + "..." + token[len(token)-4:]
-	}
-
-	// Handle raw token (legacy for non-hashed keys)
-	if len(key) <= 8 {
-		// Too short to mask meaningfully
-		return key[:4] + "..."
-	}
-	return key[:4] + "..." + key[len(key)-4:]
-}
-
 // AdminHandler provides endpoints for monitoring usage and updating limits
 type AdminHandler struct {
-	manager pricing.LimitManager
+	manager pricing.PersistentLimitManager
 }
 
-// NewAdminHandler creates a new admin handler with the given limit manager
-func NewAdminHandler(manager pricing.LimitManager) *AdminHandler {
+// NewAdminHandler creates a new admin handler with the given persistent limit manager
+func NewAdminHandler(manager pricing.PersistentLimitManager) *AdminHandler {
 	return &AdminHandler{manager: manager}
 }
 
@@ -107,18 +75,7 @@ func (ah *AdminHandler) handleUsage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return usage for all keys (no individual key queries for security)
-	var usage []pricing.UsageInfoMoney
-
-	// Use GetAllUsageWithMaskedKeys if it's a PersistentLimitManager
-	if persistentMgr, ok := ah.manager.(pricing.PersistentLimitManager); ok {
-		usage = persistentMgr.GetAllUsageWithMaskedKeys()
-	} else {
-		// Fallback to regular GetAllUsage and mask the keys
-		usage = ah.manager.GetAllUsage()
-		for i := range usage {
-			usage[i].Key = maskAPIKey(usage[i].Key)
-		}
-	}
+	usage := ah.manager.GetAllUsageWithMaskedKeys()
 
 	response := UsageResponse{
 		Usage: usage,

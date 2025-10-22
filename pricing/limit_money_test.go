@@ -183,38 +183,6 @@ func TestManagerMoney_WindowReset(t *testing.T) {
 	}
 }
 
-func TestManagerMoney_BackwardCompatibility(t *testing.T) {
-	mgr := NewManagerMoneyFromUSD(10.0)
-	key := "test-key"
-
-	mgr.AddCostFromUSD(key, 3.5)
-
-	// Test Money usage info
-	usageMoney := mgr.GetUsage(key)
-
-	// Convert to legacy format
-	usageLegacy := usageMoney.ToLegacy()
-
-	if usageLegacy.Key != usageMoney.Key {
-		t.Error("Key should match in legacy conversion")
-	}
-
-	expectedSpentUSD := 3.5
-	if abs(usageLegacy.SpentUSD-expectedSpentUSD) > 1e-8 {
-		t.Errorf("Legacy spent USD should be %f, got %f", expectedSpentUSD, usageLegacy.SpentUSD)
-	}
-
-	expectedLimitUSD := 10.0
-	if abs(usageLegacy.LimitUSD-expectedLimitUSD) > 1e-8 {
-		t.Errorf("Legacy limit USD should be %f, got %f", expectedLimitUSD, usageLegacy.LimitUSD)
-	}
-
-	expectedRemainingUSD := 6.5
-	if abs(usageLegacy.Remaining-expectedRemainingUSD) > 1e-8 {
-		t.Errorf("Legacy remaining USD should be %f, got %f", expectedRemainingUSD, usageLegacy.Remaining)
-	}
-}
-
 func abs(x float64) float64 {
 	if x < 0 {
 		return -x

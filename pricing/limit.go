@@ -46,17 +46,6 @@ func NewLimitManager(limitUSD float64) *ManagerMoney {
 	return NewManagerMoneyFromUSD(limitUSD)
 }
 
-// UsageInfo holds information about a key's current usage window (legacy format for JSON compatibility)
-type UsageInfo struct {
-	Key         string    `json:"key"`
-	SpentUSD    float64   `json:"spent_usd"`
-	LimitUSD    float64   `json:"limit_usd"`
-	WindowStart time.Time `json:"window_start"`
-	WindowEnd   time.Time `json:"window_end"`
-	Remaining   float64   `json:"remaining_usd"`
-	Allowed     bool      `json:"allowed"`
-}
-
 // Allow checks whether the given key is currently allowed to spend more using Money precision.
 // It returns allowed, windowEnd, spentSoFar, limit.
 func (m *ManagerMoney) Allow(key string) (bool, time.Time, Money, Money) {
@@ -254,23 +243,5 @@ func (m *ManagerMoney) UpdateLimitFromUSD(newLimitUSD float64) {
 		m.limit = Money(-1) // disabled
 	} else {
 		m.limit = NewMoneyFromUSD(newLimitUSD)
-	}
-}
-
-// ToLegacy converts UsageInfoMoney to UsageInfo for backward compatibility
-func (ui UsageInfoMoney) ToLegacy() UsageInfo {
-	remainingUSD := ui.Remaining.ToUSD()
-	if ui.Remaining.IsNegative() {
-		remainingUSD = -1
-	}
-
-	return UsageInfo{
-		Key:         ui.Key,
-		SpentUSD:    ui.Spent.ToUSD(),
-		LimitUSD:    ui.Limit.ToUSD(),
-		WindowStart: ui.WindowStart,
-		WindowEnd:   ui.WindowEnd,
-		Remaining:   remainingUSD,
-		Allowed:     ui.Allowed,
 	}
 }

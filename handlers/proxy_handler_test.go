@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/goverture/goxy/config"
+	"github.com/goverture/goxy/persistence"
 	"github.com/goverture/goxy/pricing"
 )
 
@@ -54,7 +55,11 @@ func TestProxy_ForwardsMethodPathQueryBodyAndHeaders(t *testing.T) {
 		OpenAIBaseURL: upstream.URL,
 	}
 
-	mgr := pricing.NewManagerMoneyFromUSD(2.0) // Default limit for basic tests
+	mgr, err := persistence.NewPersistentLimitManagerQuiet(2.0, ":memory:")
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+	defer mgr.Close()
 	h := NewProxyHandler(mgr)
 
 	// Build a request that would hit our proxy
@@ -102,7 +107,11 @@ func TestProxy_LogsParsedJSONResponse(t *testing.T) {
 
 	// Configure proxy
 	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL}
-	mgr := pricing.NewManagerMoneyFromUSD(2.0) // Default limit for logging tests
+	mgr, err := persistence.NewPersistentLimitManagerQuiet(2.0, ":memory:")
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+	defer mgr.Close()
 	h := NewProxyHandler(mgr)
 
 	// Capture stdout
@@ -154,7 +163,11 @@ func TestProxy_SpendLimitExceeded(t *testing.T) {
 
 	// Spend limit just above first request cost so second pushes over limit; third should be blocked
 	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL, SpendLimitPerHour: 0.0015}
-	mgr := pricing.NewManagerMoneyFromUSD(0.0015)
+	mgr, err := persistence.NewPersistentLimitManagerQuiet(0.0015, ":memory:")
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+	defer mgr.Close()
 	h := NewProxyHandler(mgr)
 
 	doReq := func() *httptest.ResponseRecorder {
@@ -191,7 +204,11 @@ func TestProxy_ZeroLimitBlocksImmediately(t *testing.T) {
 
 	// Zero limit => every non-anonymous key blocked right away
 	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL, SpendLimitPerHour: 0}
-	mgr := pricing.NewManagerMoneyFromUSD(0)
+	mgr, err := persistence.NewPersistentLimitManagerQuiet(0, ":memory:")
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+	defer mgr.Close()
 	h := NewProxyHandler(mgr)
 
 	req := httptest.NewRequest(http.MethodGet, "http://proxy.local/v1/test", nil)
@@ -221,7 +238,11 @@ func TestProxy_UnauthenticatedRequestsBypassLimits(t *testing.T) {
 
 	// Very low spend limit that would normally block requests
 	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL, SpendLimitPerHour: 0.000001}
-	mgr := pricing.NewManagerMoneyFromUSD(0.000001)
+	mgr, err := persistence.NewPersistentLimitManagerQuiet(0.000001, ":memory:")
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+	defer mgr.Close()
 	h := NewProxyHandler(mgr)
 
 	doUnauthenticatedReq := func() *httptest.ResponseRecorder {

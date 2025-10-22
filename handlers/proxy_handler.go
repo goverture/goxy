@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -21,7 +23,7 @@ import (
 type stripForwardingHeaders struct{ base http.RoundTripper }
 
 func (t stripForwardingHeaders) RoundTrip(r *http.Request) (*http.Response, error) {
-	// Nuke any forwarding headers (proxy won’t add them back).
+	// Nuke any forwarding headers (proxy won't add them back).
 	r.Header.Del("X-Forwarded-For")
 	r.Header.Del("X-Forwarded-Host")
 	r.Header.Del("X-Forwarded-Proto")
@@ -30,7 +32,39 @@ func (t stripForwardingHeaders) RoundTrip(r *http.Request) (*http.Response, erro
 	return t.base.RoundTrip(r)
 }
 
-func NewProxyHandler(mgr pricing.LimitManager) http.Handler {
+// hashAuthKey creates a SHA-256 hash of the authorization key for use as a database key
+// This avoids storing raw API tokens in the database while maintaining consistent tracking
+func hashAuthKey(authHeader string) string {
+	if authHeader == "" {
+		return "" // Keep empty string as-is for unauthenticated requests
+	}
+	hash := sha256.Sum256([]byte(authHeader))
+	return hex.EncodeToString(hash[:])
+}
+
+// maskAPIKeyForStorage masks an API key for storage alongside the hash
+func maskAPIKeyForStorage(key string) string {
+	if key == "" || key == "anonymous" {
+		return key
+	}
+
+	// Handle "Bearer " prefix
+	if len(key) > 7 && key[:7] == "Bearer " {
+		token := key[7:] // Remove "Bearer " prefix
+		if len(token) <= 8 {
+			return "Bearer " + token[:4] + "..."
+		}
+		return "Bearer " + token[:4] + "..." + token[len(token)-4:]
+	}
+
+	// Handle raw token
+	if len(key) <= 8 {
+		return key[:4] + "..."
+	}
+	return key[:4] + "..." + key[len(key)-4:]
+}
+
+func NewProxyHandler(mgr pricing.PersistentLimitManager) http.Handler {
 	upstreamURL := config.Cfg.OpenAIBaseURL
 	upstream, err := url.Parse(upstreamURL)
 	if err != nil {
@@ -128,9 +162,13 @@ func NewProxyHandler(mgr pricing.LimitManager) http.Handler {
 					// Use the new Money-based pricing for precision
 					if pr, err := pricing.CalculatePriceWithTier(modelName, usage, serviceTier); err == nil {
 						fmt.Println(pr.String())
-						// accumulate cost toward spend limit (use Authorization header as-is, or blank for unauthenticated)
+						// accumulate cost toward spend limit (use hashed Authorization header for privacy)
 						auth := resp.Request.Header.Get("Authorization")
-						mgr.AddCost(auth, pr.TotalCost)
+						hashedAuth := hashAuthKey(auth)
+						maskedAuth := maskAPIKeyForStorage(auth)
+
+						// Use AddCostWithMaskedKey with hashed and masked keys
+						mgr.AddCostWithMaskedKey(hashedAuth, maskedAuth, pr.TotalCost)
 					}
 				}
 			} else {
@@ -147,14 +185,15 @@ func NewProxyHandler(mgr pricing.LimitManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Extract the authorization header as-is
 		auth := r.Header.Get("Authorization")
+		hashedAuth := hashAuthKey(auth)
 
 		// Just warn if no auth header, don't block the request
 		if auth == "" {
 			fmt.Println("Warning: No Authorization header provided")
 		}
 
-		// Spend limit check BEFORE proxy (always check, use blank string for unauthenticated)
-		if allowed, windowEnd, spent, lim := mgr.Allow(auth); !allowed {
+		// Spend limit check BEFORE proxy (use hashed auth key for privacy)
+		if allowed, windowEnd, spent, lim := mgr.Allow(hashedAuth); !allowed {
 			// Compute seconds until reset (window end)
 			secUntil := int(time.Until(windowEnd).Seconds())
 			if secUntil < 0 {

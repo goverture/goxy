@@ -22,6 +22,7 @@ type PersistentLimitManager struct {
 // UsageRecord represents a usage record in the database
 type UsageRecord struct {
 	Key         string
+	MaskedKey   string
 	WindowStart time.Time
 	Spent       pricing.Money
 	LastUpdated time.Time
@@ -78,6 +79,7 @@ func (p *PersistentLimitManager) initSchema() error {
 	query := `
 	CREATE TABLE IF NOT EXISTS usage_tracking (
 		key TEXT PRIMARY KEY,
+		masked_key TEXT NOT NULL DEFAULT '',
 		window_start INTEGER NOT NULL,
 		spent INTEGER NOT NULL,
 		last_updated INTEGER NOT NULL
@@ -100,7 +102,7 @@ func (p *PersistentLimitManager) loadUsageData() error {
 	cutoff := now.Add(-time.Hour) // Only load windows that could still be active
 
 	query := `
-	SELECT key, window_start, spent, last_updated 
+	SELECT key, masked_key, window_start, spent, last_updated 
 	FROM usage_tracking 
 	WHERE window_start > ?
 	ORDER BY key
@@ -117,7 +119,7 @@ func (p *PersistentLimitManager) loadUsageData() error {
 		var record UsageRecord
 		var windowStartUnix, lastUpdatedUnix int64
 
-		err := rows.Scan(&record.Key, &windowStartUnix, &record.Spent, &lastUpdatedUnix)
+		err := rows.Scan(&record.Key, &record.MaskedKey, &windowStartUnix, &record.Spent, &lastUpdatedUnix)
 		if err != nil {
 			log.Printf("Warning: failed to scan usage record: %v", err)
 			continue
@@ -186,6 +188,12 @@ func (p *PersistentLimitManager) Close() error {
 
 // AddCost overrides the base AddCost and immediately saves to database
 func (p *PersistentLimitManager) AddCost(key string, delta pricing.Money) {
+	// For backward compatibility, call AddCostWithMaskedKey with empty masked key
+	p.AddCostWithMaskedKey(key, "", delta)
+}
+
+// AddCostWithMaskedKey adds cost and saves to database with both hashed and masked keys
+func (p *PersistentLimitManager) AddCostWithMaskedKey(key string, maskedKey string, delta pricing.Money) {
 	// First update in-memory state
 	p.ManagerMoney.AddCost(key, delta)
 
@@ -202,7 +210,7 @@ func (p *PersistentLimitManager) AddCost(key string, delta pricing.Money) {
 	}
 
 	// Save this specific key's usage to database immediately
-	if err := p.saveKeyUsage(key); err != nil {
+	if err := p.saveKeyUsageWithMasked(key, maskedKey); err != nil {
 		log.Printf("Warning: failed to save usage for key %s: %v", key, err)
 	}
 }
@@ -238,4 +246,88 @@ func (p *PersistentLimitManager) saveKeyUsage(key string) error {
 	}
 
 	return tx.Commit()
+}
+
+// saveKeyUsageWithMasked saves a single key's usage to database with masked key for display
+func (p *PersistentLimitManager) saveKeyUsageWithMasked(key string, maskedKey string) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	// Get current usage for this key
+	usage := p.ManagerMoney.GetUsage(key)
+
+	// Only save if there's actual spending
+	if usage.Spent.IsZero() {
+		return nil
+	}
+
+	// Begin transaction
+	tx, err := p.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Insert or replace the record for this key
+	_, err = tx.Exec(`
+		INSERT OR REPLACE INTO usage_tracking (key, masked_key, window_start, spent, last_updated)
+		VALUES (?, ?, ?, ?, ?)
+	`, key, maskedKey, usage.WindowStart.Unix(), int64(usage.Spent), time.Now().Unix())
+
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+// GetAllUsageWithMaskedKeys returns usage information with original masked keys from database
+func (p *PersistentLimitManager) GetAllUsageWithMaskedKeys() []pricing.UsageInfoMoney {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	// Get the current in-memory usage data
+	inMemoryUsage := p.ManagerMoney.GetAllUsage()
+
+	// Create a map for quick lookup
+	usageMap := make(map[string]pricing.UsageInfoMoney)
+	for _, usage := range inMemoryUsage {
+		usageMap[usage.Key] = usage
+	}
+
+	// Query database for masked keys
+	query := `SELECT key, masked_key FROM usage_tracking WHERE masked_key != ''`
+	rows, err := p.db.Query(query)
+	if err != nil {
+		log.Printf("Warning: failed to query masked keys: %v", err)
+		return inMemoryUsage // fallback to in-memory data
+	}
+	defer rows.Close()
+
+	// Build result with masked keys where available
+	var result []pricing.UsageInfoMoney
+	processedKeys := make(map[string]bool)
+
+	for rows.Next() {
+		var key, maskedKey string
+		if err := rows.Scan(&key, &maskedKey); err != nil {
+			continue
+		}
+
+		if usage, exists := usageMap[key]; exists {
+			// Replace the hash key with the masked key for display
+			usage.Key = maskedKey
+			result = append(result, usage)
+			processedKeys[key] = true
+		}
+	}
+
+	// Add any remaining usage that wasn't in the database (shouldn't happen normally)
+	for _, usage := range inMemoryUsage {
+		if !processedKeys[usage.Key] {
+			result = append(result, usage)
+		}
+	}
+
+	return result
 }

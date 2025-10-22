@@ -3,18 +3,25 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/goverture/goxy/pricing"
 )
 
-// maskAPIKey masks an API key to show only first 4 and last 4 characters
-// e.g., "Bearer sk-1234567890abcdef" becomes "sk-1234...cdef"
+// maskAPIKey formats a key for display in admin responses
+// For already-masked keys, returns as-is
+// For raw keys (fallback), provides traditional masking
 func maskAPIKey(key string) string {
 	if key == "" || key == "anonymous" {
 		return key
 	}
 
-	// Handle "Bearer " prefix
+	// If it already looks masked (contains "..."), return as-is
+	if strings.Contains(key, "...") {
+		return key
+	}
+
+	// Handle "Bearer " prefix (legacy for non-hashed keys)
 	if len(key) > 7 && key[:7] == "Bearer " {
 		token := key[7:] // Remove "Bearer " prefix
 		if len(token) <= 8 {
@@ -24,7 +31,7 @@ func maskAPIKey(key string) string {
 		return "Bearer " + token[:4] + "..." + token[len(token)-4:]
 	}
 
-	// Handle raw token
+	// Handle raw token (legacy for non-hashed keys)
 	if len(key) <= 8 {
 		// Too short to mask meaningfully
 		return key[:4] + "..."
@@ -100,11 +107,17 @@ func (ah *AdminHandler) handleUsage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return usage for all keys (no individual key queries for security)
-	usage := ah.manager.GetAllUsage()
+	var usage []pricing.UsageInfoMoney
 
-	// Mask keys for security
-	for i := range usage {
-		usage[i].Key = maskAPIKey(usage[i].Key)
+	// Use GetAllUsageWithMaskedKeys if it's a PersistentLimitManager
+	if persistentMgr, ok := ah.manager.(pricing.PersistentLimitManager); ok {
+		usage = persistentMgr.GetAllUsageWithMaskedKeys()
+	} else {
+		// Fallback to regular GetAllUsage and mask the keys
+		usage = ah.manager.GetAllUsage()
+		for i := range usage {
+			usage[i].Key = maskAPIKey(usage[i].Key)
+		}
 	}
 
 	response := UsageResponse{

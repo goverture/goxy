@@ -25,3 +25,17 @@ type LimitManager interface {
 	// UpdateLimitFromUSD updates the spending limit from USD
 	UpdateLimitFromUSD(newLimitUSD float64)
 }
+
+// PersistentLimitManager extends LimitManager with persistence-specific functionality
+type PersistentLimitManager interface {
+	LimitManager
+
+	// AddCostWithMaskedKey adds cost with both hashed key (for tracking) and masked key (for display)
+	AddCostWithMaskedKey(key string, maskedKey string, delta Money)
+
+	// GetAllUsageWithMaskedKeys returns usage information with original masked keys from database
+	GetAllUsageWithMaskedKeys() []UsageInfoMoney
+
+	// Close shuts down the persistent manager gracefully
+	Close() error
+}

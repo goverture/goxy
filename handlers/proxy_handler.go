@@ -2,8 +2,6 @@ package handlers
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -17,6 +15,7 @@ import (
 
 	"github.com/goverture/goxy/config"
 	"github.com/goverture/goxy/pricing"
+	"github.com/goverture/goxy/utils"
 )
 
 // stripForwardingHeaders removes X-Forwarded-* and similar before the upstream call.
@@ -30,38 +29,6 @@ func (t stripForwardingHeaders) RoundTrip(r *http.Request) (*http.Response, erro
 	r.Header.Del("Forwarded")
 	r.Header.Del("X-Real-IP")
 	return t.base.RoundTrip(r)
-}
-
-// hashAuthKey creates a SHA-256 hash of the authorization key for use as a database key
-// This avoids storing raw API tokens in the database while maintaining consistent tracking
-func hashAuthKey(authHeader string) string {
-	if authHeader == "" {
-		return "" // Keep empty string as-is for unauthenticated requests
-	}
-	hash := sha256.Sum256([]byte(authHeader))
-	return hex.EncodeToString(hash[:])
-}
-
-// maskAPIKeyForStorage masks an API key for storage alongside the hash
-func maskAPIKeyForStorage(key string) string {
-	if key == "" || key == "anonymous" {
-		return key
-	}
-
-	// Handle "Bearer " prefix
-	if len(key) > 7 && key[:7] == "Bearer " {
-		token := key[7:] // Remove "Bearer " prefix
-		if len(token) <= 8 {
-			return "Bearer " + token[:4] + "..."
-		}
-		return "Bearer " + token[:4] + "..." + token[len(token)-4:]
-	}
-
-	// Handle raw token
-	if len(key) <= 8 {
-		return key[:4] + "..."
-	}
-	return key[:4] + "..." + key[len(key)-4:]
 }
 
 func NewProxyHandler(mgr pricing.PersistentLimitManager) http.Handler {
@@ -164,8 +131,8 @@ func NewProxyHandler(mgr pricing.PersistentLimitManager) http.Handler {
 						fmt.Println(pr.String())
 						// accumulate cost toward spend limit (use hashed Authorization header for privacy)
 						auth := resp.Request.Header.Get("Authorization")
-						hashedAuth := hashAuthKey(auth)
-						maskedAuth := maskAPIKeyForStorage(auth)
+						hashedAuth := utils.HashAuthKey(auth)
+						maskedAuth := utils.MaskAPIKeyForStorage(auth)
 
 						// Use AddCostWithMaskedKey with hashed and masked keys
 						mgr.AddCostWithMaskedKey(hashedAuth, maskedAuth, pr.TotalCost)
@@ -185,7 +152,7 @@ func NewProxyHandler(mgr pricing.PersistentLimitManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Extract the authorization header as-is
 		auth := r.Header.Get("Authorization")
-		hashedAuth := hashAuthKey(auth)
+		hashedAuth := utils.HashAuthKey(auth)
 
 		// Just warn if no auth header, don't block the request
 		if auth == "" {

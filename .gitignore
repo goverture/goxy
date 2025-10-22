@@ -6,3 +6,4 @@ coverage.out
 coverage.html
 .internal/
 goxy_usage.db
+.vscode

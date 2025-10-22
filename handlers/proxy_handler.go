@@ -15,13 +15,14 @@ import (
 
 	"github.com/goverture/goxy/config"
 	"github.com/goverture/goxy/pricing"
+	"github.com/goverture/goxy/utils"
 )
 
 // stripForwardingHeaders removes X-Forwarded-* and similar before the upstream call.
 type stripForwardingHeaders struct{ base http.RoundTripper }
 
 func (t stripForwardingHeaders) RoundTrip(r *http.Request) (*http.Response, error) {
-	// Nuke any forwarding headers (proxy won’t add them back).
+	// Nuke any forwarding headers (proxy won't add them back).
 	r.Header.Del("X-Forwarded-For")
 	r.Header.Del("X-Forwarded-Host")
 	r.Header.Del("X-Forwarded-Proto")
@@ -30,7 +31,7 @@ func (t stripForwardingHeaders) RoundTrip(r *http.Request) (*http.Response, erro
 	return t.base.RoundTrip(r)
 }
 
-func NewProxyHandler(mgr pricing.LimitManager) http.Handler {
+func NewProxyHandler(mgr pricing.PersistentLimitManager) http.Handler {
 	upstreamURL := config.Cfg.OpenAIBaseURL
 	upstream, err := url.Parse(upstreamURL)
 	if err != nil {
@@ -128,9 +129,13 @@ func NewProxyHandler(mgr pricing.LimitManager) http.Handler {
 					// Use the new Money-based pricing for precision
 					if pr, err := pricing.CalculatePriceWithTier(modelName, usage, serviceTier); err == nil {
 						fmt.Println(pr.String())
-						// accumulate cost toward spend limit (use Authorization header as-is, or blank for unauthenticated)
+						// accumulate cost toward spend limit (use hashed Authorization header for privacy)
 						auth := resp.Request.Header.Get("Authorization")
-						mgr.AddCost(auth, pr.TotalCost)
+						hashedAuth := utils.HashAuthKey(auth)
+						maskedAuth := utils.MaskAPIKeyForStorage(auth)
+
+						// Use AddCostWithMaskedKey with hashed and masked keys
+						mgr.AddCostWithMaskedKey(hashedAuth, maskedAuth, pr.TotalCost)
 					}
 				}
 			} else {
@@ -147,14 +152,15 @@ func NewProxyHandler(mgr pricing.LimitManager) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Extract the authorization header as-is
 		auth := r.Header.Get("Authorization")
+		hashedAuth := utils.HashAuthKey(auth)
 
 		// Just warn if no auth header, don't block the request
 		if auth == "" {
 			fmt.Println("Warning: No Authorization header provided")
 		}
 
-		// Spend limit check BEFORE proxy (always check, use blank string for unauthenticated)
-		if allowed, windowEnd, spent, lim := mgr.Allow(auth); !allowed {
+		// Spend limit check BEFORE proxy (use hashed auth key for privacy)
+		if allowed, windowEnd, spent, lim := mgr.Allow(hashedAuth); !allowed {
 			// Compute seconds until reset (window end)
 			secUntil := int(time.Until(windowEnd).Seconds())
 			if secUntil < 0 {

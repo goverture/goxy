@@ -7,38 +7,13 @@ import (
 	"github.com/goverture/goxy/pricing"
 )
 
-// maskAPIKey masks an API key to show only first 4 and last 4 characters
-// e.g., "Bearer sk-1234567890abcdef" becomes "sk-1234...cdef"
-func maskAPIKey(key string) string {
-	if key == "" || key == "anonymous" {
-		return key
-	}
-
-	// Handle "Bearer " prefix
-	if len(key) > 7 && key[:7] == "Bearer " {
-		token := key[7:] // Remove "Bearer " prefix
-		if len(token) <= 8 {
-			// Too short to mask meaningfully
-			return "Bearer " + token[:4] + "..."
-		}
-		return "Bearer " + token[:4] + "..." + token[len(token)-4:]
-	}
-
-	// Handle raw token
-	if len(key) <= 8 {
-		// Too short to mask meaningfully
-		return key[:4] + "..."
-	}
-	return key[:4] + "..." + key[len(key)-4:]
-}
-
 // AdminHandler provides endpoints for monitoring usage and updating limits
 type AdminHandler struct {
-	manager pricing.LimitManager
+	manager pricing.PersistentLimitManager
 }
 
-// NewAdminHandler creates a new admin handler with the given limit manager
-func NewAdminHandler(manager pricing.LimitManager) *AdminHandler {
+// NewAdminHandler creates a new admin handler with the given persistent limit manager
+func NewAdminHandler(manager pricing.PersistentLimitManager) *AdminHandler {
 	return &AdminHandler{manager: manager}
 }
 
@@ -100,12 +75,7 @@ func (ah *AdminHandler) handleUsage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return usage for all keys (no individual key queries for security)
-	usage := ah.manager.GetAllUsage()
-
-	// Mask keys for security
-	for i := range usage {
-		usage[i].Key = maskAPIKey(usage[i].Key)
-	}
+	usage := ah.manager.GetAllUsageWithMaskedKeys()
 
 	response := UsageResponse{
 		Usage: usage,

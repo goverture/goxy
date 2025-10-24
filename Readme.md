@@ -24,7 +24,7 @@ Lightweight **OpenAI API proxy** with **spending limits**. Drop it in front of y
 
 ## TODOs
 
-- [ ] Don't use float64 for pricing computation (not precise)
+- [x] Don't use float64 for pricing computation (not precise)
 
 ## 🚀 Install
 

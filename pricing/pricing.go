@@ -132,16 +132,15 @@ func ComputePriceMoneyWithTier(modelRaw string, u Usage, serviceTier string) (Pr
 		nonCachedTokens := u.PromptTokens - cached
 
 		// Use precise Money arithmetic
-		// TODO: Why are we using float64 then !
-		nonCachedCost := promptPrice.Multiply(float64(nonCachedTokens))
-		cachedCost := cachedPromptPrice.Multiply(float64(cached))
+		nonCachedCost := promptPrice.Multiply(int64(nonCachedTokens))
+		cachedCost := cachedPromptPrice.Multiply(int64(cached))
 		ptCost = nonCachedCost.Add(cachedCost)
 	} else {
 		// All prompt tokens are regular (non-cached)
-		ptCost = promptPrice.Multiply(float64(u.PromptTokens))
+		ptCost = promptPrice.Multiply(int64(u.PromptTokens))
 	}
 
-	ctCost := completionPrice.Multiply(float64(u.CompletionTokens))
+	ctCost := completionPrice.Multiply(int64(u.CompletionTokens))
 	total := ptCost.Add(ctCost)
 
 	note := "prices loaded from config; verify against https://openai.com/api/pricing/"

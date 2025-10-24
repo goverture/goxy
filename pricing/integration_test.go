@@ -31,8 +31,8 @@ func TestIntegerBasedPricingBenefits(t *testing.T) {
 	}
 
 	// Verify precision - the key benefit of Money-based arithmetic
-	expectedPromptCostNonCached := NewMoneyFromUSD(0.000001 / 1000000.0).Multiply(500000.0) // 500K non-cached tokens
-	expectedPromptCostCached := NewMoneyFromUSD(0.0000001 / 1000000.0).Multiply(500000.0)   // 500K cached tokens
+	expectedPromptCostNonCached := NewMoneyFromUSD(0.000001 / 1000000.0).Multiply(500000) // 500K non-cached tokens
+	expectedPromptCostCached := NewMoneyFromUSD(0.0000001 / 1000000.0).Multiply(500000)   // 500K cached tokens
 	expectedTotalPromptCost := expectedPromptCostNonCached.Add(expectedPromptCostCached)
 
 	if moneyResult.PromptCost != expectedTotalPromptCost {

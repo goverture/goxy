@@ -97,7 +97,7 @@ func TestMoney_Arithmetic(t *testing.T) {
 	}
 
 	// Test multiplication
-	product := money1.Multiply(2.0)
+	product := money1.Multiply(2)
 	expectedProduct := NewMoneyFromUSD(21.0)
 	if product != expectedProduct {
 		t.Errorf("Multiply: got %d, want %d", product, expectedProduct)
@@ -219,7 +219,7 @@ func TestMinMoney(t *testing.T) {
 		accumulated = accumulated.Add(MinMoney)
 	}
 
-	expectedAccumulated := MinMoney.Multiply(float64(iterations))
+	expectedAccumulated := MinMoney.Multiply(int64(iterations))
 	if accumulated != expectedAccumulated {
 		t.Errorf("MinMoney accumulation failed: got %d, want %d", int64(accumulated), int64(expectedAccumulated))
 	}

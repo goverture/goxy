@@ -187,6 +187,7 @@ func (p *PersistentLimitManager) Close() error {
 }
 
 // AddCost overrides the base AddCost and immediately saves to database
+// TODO: Not a fan, consider removing me later
 func (p *PersistentLimitManager) AddCost(key string, delta pricing.Money) {
 	// For backward compatibility, call AddCostWithMaskedKey with empty masked key
 	p.AddCostWithMaskedKey(key, "", delta)
@@ -213,39 +214,6 @@ func (p *PersistentLimitManager) AddCostWithMaskedKey(key string, maskedKey stri
 	if err := p.saveKeyUsageWithMasked(key, maskedKey); err != nil {
 		log.Printf("Warning: failed to save usage for key %s: %v", key, err)
 	}
-}
-
-// saveKeyUsage saves a single key's usage to database with proper mutex protection
-func (p *PersistentLimitManager) saveKeyUsage(key string) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	// Get current usage for this key
-	usage := p.ManagerMoney.GetUsage(key)
-
-	// Only save if there's actual spending
-	if usage.Spent.IsZero() {
-		return nil
-	}
-
-	// Begin transaction
-	tx, err := p.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	// Insert or replace the record for this key
-	_, err = tx.Exec(`
-		INSERT OR REPLACE INTO usage_tracking (key, window_start, spent, last_updated)
-		VALUES (?, ?, ?, ?)
-	`, key, usage.WindowStart.Unix(), int64(usage.Spent), time.Now().Unix())
-
-	if err != nil {
-		return err
-	}
-
-	return tx.Commit()
 }
 
 // saveKeyUsageWithMasked saves a single key's usage to database with masked key for display

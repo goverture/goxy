@@ -125,7 +125,7 @@ func NewProxyHandler(mgr pricing.PersistentLimitManager) http.Handler {
 					serviceTier = tierRaw
 				}
 
-				if usage, ok := parseUsageFromResponse(parsed); ok {
+				if usage, ok := pricing.ParseUsageFromResponse(parsed); ok {
 					// Use the new Money-based pricing for precision
 					if pr, err := pricing.CalculatePriceWithTier(modelName, usage, serviceTier); err == nil {
 						fmt.Println(pr.String())

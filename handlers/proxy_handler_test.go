@@ -56,7 +56,7 @@ func TestProxy_ForwardsMethodPathQueryBodyAndHeaders(t *testing.T) {
 		OpenAIBaseURL: upstream.URL,
 	}
 
-	mgr, err := persistence.NewPersistentLimitManagerQuiet(2.0, ":memory:")
+	mgr, err := persistence.NewPersistentLimitManager(2.0, ":memory:")
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -108,7 +108,7 @@ func TestProxy_LogsParsedJSONResponse(t *testing.T) {
 
 	// Configure proxy
 	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL}
-	mgr, err := persistence.NewPersistentLimitManagerQuiet(2.0, ":memory:")
+	mgr, err := persistence.NewPersistentLimitManager(2.0, ":memory:")
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -164,7 +164,7 @@ func TestProxy_SpendLimitExceeded(t *testing.T) {
 
 	// Spend limit just above first request cost so second pushes over limit; third should be blocked
 	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL, SpendLimitPerHour: 0.0015}
-	mgr, err := persistence.NewPersistentLimitManagerQuiet(0.0015, ":memory:")
+	mgr, err := persistence.NewPersistentLimitManager(0.0015, ":memory:")
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -205,7 +205,7 @@ func TestProxy_ZeroLimitBlocksImmediately(t *testing.T) {
 
 	// Zero limit => every non-anonymous key blocked right away
 	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL, SpendLimitPerHour: 0}
-	mgr, err := persistence.NewPersistentLimitManagerQuiet(0, ":memory:")
+	mgr, err := persistence.NewPersistentLimitManager(0, ":memory:")
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -239,7 +239,7 @@ func TestProxy_UnauthenticatedRequestsBypassLimits(t *testing.T) {
 
 	// Very low spend limit that would normally block requests
 	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL, SpendLimitPerHour: 0.000001}
-	mgr, err := persistence.NewPersistentLimitManagerQuiet(0.000001, ":memory:")
+	mgr, err := persistence.NewPersistentLimitManager(0.000001, ":memory:")
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -301,7 +301,7 @@ func TestProxy_ConcurrentRequestsCostAccumulation(t *testing.T) {
 
 	// Set high enough limit to allow all concurrent requests
 	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL, SpendLimitPerHour: 1.0}
-	mgr, err := persistence.NewPersistentLimitManagerQuiet(1.0, tmpFile)
+	mgr, err := persistence.NewPersistentLimitManager(1.0, tmpFile)
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -364,7 +364,7 @@ func TestProxy_ConcurrentRequestsCostAccumulation(t *testing.T) {
 	// Test database persistence - close and reload
 	mgr.Close()
 
-	mgr2, err := persistence.NewPersistentLimitManagerQuiet(1.0, tmpFile)
+	mgr2, err := persistence.NewPersistentLimitManager(1.0, tmpFile)
 	if err != nil {
 		t.Fatalf("failed to create second manager: %v", err)
 	}
@@ -394,7 +394,7 @@ func TestProxy_HighConcurrencyStressTest(t *testing.T) {
 
 	// Set high enough limit to allow all concurrent requests
 	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL, SpendLimitPerHour: 1.0}
-	mgr, err := persistence.NewPersistentLimitManagerQuiet(1.0, ":memory:")
+	mgr, err := persistence.NewPersistentLimitManager(1.0, ":memory:")
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}

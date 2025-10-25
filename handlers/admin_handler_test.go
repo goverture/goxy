@@ -18,7 +18,7 @@ func createTestManager(t *testing.T, limitUSD float64) *persistence.PersistentLi
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test.db")
 
-	mgr, err := persistence.NewPersistentLimitManagerQuiet(limitUSD, dbPath)
+	mgr, err := persistence.NewPersistentLimitManager(limitUSD, dbPath)
 	if err != nil {
 		t.Fatalf("Failed to create test persistent manager: %v", err)
 	}

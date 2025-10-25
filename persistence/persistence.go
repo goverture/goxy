@@ -16,7 +16,6 @@ type PersistentLimitManager struct {
 	db       *sql.DB
 	mu       sync.RWMutex
 	stopChan chan struct{}
-	quiet    bool // If true, suppresses non-error logging
 }
 
 // UsageRecord represents a usage record in the database
@@ -30,16 +29,11 @@ type UsageRecord struct {
 
 // NewPersistentLimitManager creates a new persistent limit manager
 func NewPersistentLimitManager(limitUSD float64, dbPath string) (*PersistentLimitManager, error) {
-	return NewPersistentLimitManagerWithOptions(limitUSD, dbPath, false)
-}
-
-// NewPersistentLimitManagerQuiet creates a persistent limit manager with minimal logging
-func NewPersistentLimitManagerQuiet(limitUSD float64, dbPath string) (*PersistentLimitManager, error) {
-	return NewPersistentLimitManagerWithOptions(limitUSD, dbPath, true)
+	return NewPersistentLimitManagerWithOptions(limitUSD, dbPath)
 }
 
 // NewPersistentLimitManagerWithOptions creates a new persistent limit manager with configuration options
-func NewPersistentLimitManagerWithOptions(limitUSD float64, dbPath string, quiet bool) (*PersistentLimitManager, error) {
+func NewPersistentLimitManagerWithOptions(limitUSD float64, dbPath string) (*PersistentLimitManager, error) {
 	// Create the underlying manager
 	mgr := pricing.NewLimitManager(limitUSD)
 
@@ -58,7 +52,6 @@ func NewPersistentLimitManagerWithOptions(limitUSD float64, dbPath string, quiet
 		ManagerMoney: mgr,
 		db:           db,
 		stopChan:     make(chan struct{}),
-		quiet:        quiet,
 	}
 
 	// Initialize database schema
@@ -126,7 +119,6 @@ func (p *PersistentLimitManager) loadUsageData() error {
 		}
 
 		record.WindowStart = time.Unix(windowStartUnix, 0)
-		record.LastUpdated = time.Unix(lastUpdatedUnix, 0)
 
 		// Check if window is still active (within the last hour)
 		if now.Sub(record.WindowStart) < time.Hour {
@@ -140,9 +132,8 @@ func (p *PersistentLimitManager) loadUsageData() error {
 		return err
 	}
 
-	if !p.quiet {
-		log.Printf("Loaded %d active usage records from database", loadedCount)
-	}
+	log.Printf("Loaded %d active usage records from database", loadedCount)
+
 	return nil
 }
 
@@ -160,7 +151,7 @@ func (p *PersistentLimitManager) cleanupOldRecords() error {
 	}
 
 	affected, _ := result.RowsAffected()
-	if affected > 0 && !p.quiet {
+	if affected > 0 {
 		log.Printf("Cleaned up %d old usage records", affected)
 	}
 

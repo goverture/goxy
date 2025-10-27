@@ -24,7 +24,9 @@ Lightweight **OpenAI API proxy** with **spending limits**. Drop it in front of y
 
 ## TODOs
 
-- [ ] Don't use float64 for pricing computation (not precise)
+- [x] Don't use float64 for pricing computation (not precise)
+- [ ] Support for custom models (finetune etc)
+- [ ] Standalone "pricing" lib with examples
 
 ## 🚀 Install
 

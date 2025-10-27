@@ -12,6 +12,7 @@ import (
 	"github.com/goverture/goxy/config"
 	"github.com/goverture/goxy/persistence"
 	"github.com/goverture/goxy/pricing"
+	"github.com/goverture/goxy/utils"
 )
 
 // setupTestPricingConfig ensures pricing configuration is available for tests
@@ -55,7 +56,7 @@ func TestProxy_ForwardsMethodPathQueryBodyAndHeaders(t *testing.T) {
 		OpenAIBaseURL: upstream.URL,
 	}
 
-	mgr, err := persistence.NewPersistentLimitManagerQuiet(2.0, ":memory:")
+	mgr, err := persistence.NewPersistentLimitManager(2.0, ":memory:")
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -107,7 +108,7 @@ func TestProxy_LogsParsedJSONResponse(t *testing.T) {
 
 	// Configure proxy
 	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL}
-	mgr, err := persistence.NewPersistentLimitManagerQuiet(2.0, ":memory:")
+	mgr, err := persistence.NewPersistentLimitManager(2.0, ":memory:")
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -163,7 +164,7 @@ func TestProxy_SpendLimitExceeded(t *testing.T) {
 
 	// Spend limit just above first request cost so second pushes over limit; third should be blocked
 	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL, SpendLimitPerHour: 0.0015}
-	mgr, err := persistence.NewPersistentLimitManagerQuiet(0.0015, ":memory:")
+	mgr, err := persistence.NewPersistentLimitManager(0.0015, ":memory:")
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -204,7 +205,7 @@ func TestProxy_ZeroLimitBlocksImmediately(t *testing.T) {
 
 	// Zero limit => every non-anonymous key blocked right away
 	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL, SpendLimitPerHour: 0}
-	mgr, err := persistence.NewPersistentLimitManagerQuiet(0, ":memory:")
+	mgr, err := persistence.NewPersistentLimitManager(0, ":memory:")
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -238,7 +239,7 @@ func TestProxy_UnauthenticatedRequestsBypassLimits(t *testing.T) {
 
 	// Very low spend limit that would normally block requests
 	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL, SpendLimitPerHour: 0.000001}
-	mgr, err := persistence.NewPersistentLimitManagerQuiet(0.000001, ":memory:")
+	mgr, err := persistence.NewPersistentLimitManager(0.000001, ":memory:")
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
@@ -280,4 +281,177 @@ func TestProxy_UnauthenticatedRequestsBypassLimits(t *testing.T) {
 	if rr := doAuthenticatedReq(); rr.Code != http.StatusTooManyRequests {
 		t.Fatalf("expected 429 on second authenticated request, got %d body=%s", rr.Code, rr.Body.String())
 	}
+}
+
+func TestProxy_ConcurrentRequestsCostAccumulation(t *testing.T) {
+	// Setup pricing configuration for tests
+	setupTestPricingConfig()
+
+	// Upstream server that returns pricing-eligible JSON with known cost
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		// Each request costs: 100 tokens * $5.0/1M = $0.0005
+		w.Write([]byte(`{"model":"gpt-4o","usage":{"prompt_tokens":100,"completion_tokens":0}}`))
+	}))
+	defer upstream.Close()
+
+	// Use a temporary file for database to test persistence
+	tmpFile := "/tmp/test_concurrency.db"
+	defer os.Remove(tmpFile)
+
+	// Set high enough limit to allow all concurrent requests
+	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL, SpendLimitPerHour: 1.0}
+	mgr, err := persistence.NewPersistentLimitManager(1.0, tmpFile)
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+	h := NewProxyHandler(mgr)
+
+	// Number of concurrent requests to make
+	numRequests := 10
+	expectedCostPerRequest := pricing.NewMoneyFromUSD(0.0005) // 100 tokens * $5.0/1M
+	expectedTotalCost := expectedCostPerRequest.Multiply(int64(numRequests))
+
+	// Use a single auth key for all requests so they accumulate
+	authKey := "Bearer test-concurrent-key"
+	hashedAuthKey := utils.HashAuthKey(authKey)
+
+	// Channel to collect results
+	results := make(chan *httptest.ResponseRecorder, numRequests)
+
+	// Start all requests concurrently
+	for i := 0; i < numRequests; i++ {
+		go func() {
+			req := httptest.NewRequest(http.MethodPost, "http://proxy.local/v1/chat/completions", nil)
+			req.Header.Set("Authorization", authKey)
+			rr := httptest.NewRecorder()
+			h.ServeHTTP(rr, req)
+			results <- rr
+		}()
+	}
+
+	// Collect all results
+	successCount := 0
+	for i := 0; i < numRequests; i++ {
+		rr := <-results
+		if rr.Code == http.StatusOK {
+			successCount++
+		} else {
+			t.Logf("Request %d failed with status %d: %s", i, rr.Code, rr.Body.String())
+		}
+	}
+
+	// All requests should have succeeded since we set a high limit
+	if successCount != numRequests {
+		t.Fatalf("expected %d successful requests, got %d", numRequests, successCount)
+	}
+
+	// Check that the total accumulated cost is correct
+	usage := mgr.GetUsage(hashedAuthKey)
+	actualTotalCost := usage.Spent
+
+	// The cost should be exactly expected (Money is precise integer arithmetic)
+	if actualTotalCost != expectedTotalCost {
+		t.Fatalf("expected total cost $%.8f, got $%.8f (difference: $%.8f)",
+			expectedTotalCost.ToUSD(),
+			actualTotalCost.ToUSD(),
+			pricing.Money(expectedTotalCost-actualTotalCost).ToUSD())
+	}
+
+	t.Logf("Concurrency test passed: %d requests, expected cost $%.8f, actual cost $%.8f",
+		numRequests, expectedTotalCost.ToUSD(), actualTotalCost.ToUSD())
+
+	// Test database persistence - close and reload
+	mgr.Close()
+
+	mgr2, err := persistence.NewPersistentLimitManager(1.0, tmpFile)
+	if err != nil {
+		t.Fatalf("failed to create second manager: %v", err)
+	}
+	defer mgr2.Close()
+
+	// Verify costs were loaded from database
+	usage2 := mgr2.GetUsage(hashedAuthKey)
+	if usage2.Spent != expectedTotalCost {
+		t.Fatalf("database persistence failed: expected $%.8f, got $%.8f",
+			expectedTotalCost.ToUSD(), usage2.Spent.ToUSD())
+	}
+
+	t.Logf("Database persistence verified: loaded $%.8f from database", usage2.Spent.ToUSD())
+}
+
+func TestProxy_HighConcurrencyStressTest(t *testing.T) {
+	// Setup pricing configuration for tests
+	setupTestPricingConfig()
+
+	// Upstream server that returns pricing-eligible JSON with known cost
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		// Each request costs: 50 tokens * $5.0/1M = $0.00025
+		w.Write([]byte(`{"model":"gpt-4o","usage":{"prompt_tokens":50,"completion_tokens":0}}`))
+	}))
+	defer upstream.Close()
+
+	// Set high enough limit to allow all concurrent requests
+	config.Cfg = &config.Config{OpenAIBaseURL: upstream.URL, SpendLimitPerHour: 1.0}
+	mgr, err := persistence.NewPersistentLimitManager(1.0, ":memory:")
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+	defer mgr.Close()
+	h := NewProxyHandler(mgr)
+
+	// High concurrency test - 100 requests
+	numRequests := 100
+	expectedCostPerRequest := pricing.NewMoneyFromUSD(0.00025) // 50 tokens * $5.0/1M
+	expectedTotalCost := expectedCostPerRequest.Multiply(int64(numRequests))
+
+	// Use a single auth key for all requests so they accumulate
+	authKey := "Bearer test-stress-key"
+	hashedAuthKey := utils.HashAuthKey(authKey)
+
+	// Channel to collect results
+	results := make(chan *httptest.ResponseRecorder, numRequests)
+
+	// Start all requests concurrently
+	for i := 0; i < numRequests; i++ {
+		go func(reqNum int) {
+			req := httptest.NewRequest(http.MethodPost, "http://proxy.local/v1/chat/completions", nil)
+			req.Header.Set("Authorization", authKey)
+			rr := httptest.NewRecorder()
+			h.ServeHTTP(rr, req)
+			results <- rr
+		}(i)
+	}
+
+	// Collect all results
+	successCount := 0
+	for i := 0; i < numRequests; i++ {
+		rr := <-results
+		if rr.Code == http.StatusOK {
+			successCount++
+		} else {
+			t.Logf("Request %d failed with status %d: %s", i, rr.Code, rr.Body.String())
+		}
+	}
+
+	// All requests should have succeeded since we set a high limit
+	if successCount != numRequests {
+		t.Fatalf("expected %d successful requests, got %d", numRequests, successCount)
+	}
+
+	// Check that the total accumulated cost is correct
+	usage := mgr.GetUsage(hashedAuthKey)
+	actualTotalCost := usage.Spent
+
+	// The cost should be exactly expected (Money is precise integer arithmetic)
+	if actualTotalCost != expectedTotalCost {
+		t.Fatalf("expected total cost $%.8f, got $%.8f (difference: $%.8f)",
+			expectedTotalCost.ToUSD(),
+			actualTotalCost.ToUSD(),
+			pricing.Money(expectedTotalCost-actualTotalCost).ToUSD())
+	}
+
+	t.Logf("High concurrency stress test passed: %d requests, expected cost $%.8f, actual cost $%.8f",
+		numRequests, expectedTotalCost.ToUSD(), actualTotalCost.ToUSD())
 }

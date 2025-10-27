@@ -1,13 +1,11 @@
-package handlers
+package pricing
 
 import (
 	"fmt"
-
-	"github.com/goverture/goxy/pricing"
 )
 
 // parseUsageFromResponse extracts usage information from API responses based on object type
-func parseUsageFromResponse(parsed map[string]interface{}) (pricing.Usage, bool) {
+func ParseUsageFromResponse(parsed map[string]interface{}) (Usage, bool) {
 	objectType, _ := parsed["object"].(string)
 
 	switch objectType {
@@ -19,18 +17,18 @@ func parseUsageFromResponse(parsed map[string]interface{}) (pricing.Usage, bool)
 		return parseChatCompletionUsage(parsed)
 	default:
 		fmt.Printf("[proxy] Warning: Unsupported object type '%s' for pricing calculation\n", objectType)
-		return pricing.Usage{}, false
+		return Usage{}, false
 	}
 }
 
 // parseChatCompletionUsage extracts usage from chat completions API responses
-func parseChatCompletionUsage(parsed map[string]interface{}) (pricing.Usage, bool) {
+func parseChatCompletionUsage(parsed map[string]interface{}) (Usage, bool) {
 	usageRaw, ok := parsed["usage"].(map[string]interface{})
 	if !ok {
-		return pricing.Usage{}, false
+		return Usage{}, false
 	}
 
-	u := pricing.Usage{}
+	u := Usage{}
 
 	// Chat completions API uses prompt_tokens/completion_tokens
 	if v, ok := usageRaw["prompt_tokens"].(float64); ok {
@@ -51,13 +49,13 @@ func parseChatCompletionUsage(parsed map[string]interface{}) (pricing.Usage, boo
 }
 
 // parseResponseAPIUsage extracts usage from responses API responses
-func parseResponseAPIUsage(parsed map[string]interface{}) (pricing.Usage, bool) {
+func parseResponseAPIUsage(parsed map[string]interface{}) (Usage, bool) {
 	usageRaw, ok := parsed["usage"].(map[string]interface{})
 	if !ok {
-		return pricing.Usage{}, false
+		return Usage{}, false
 	}
 
-	u := pricing.Usage{}
+	u := Usage{}
 
 	// Responses API uses input_tokens/output_tokens
 	if v, ok := usageRaw["input_tokens"].(float64); ok {

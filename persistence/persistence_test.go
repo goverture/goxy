@@ -404,8 +404,7 @@ func BenchmarkPersistentLimitManager_AddCost(b *testing.B) {
 	tmpDir := b.TempDir()
 	dbPath := filepath.Join(tmpDir, "bench.db")
 
-	// Use quiet mode to suppress logging during benchmarks
-	mgr, err := NewPersistentLimitManagerQuiet(100.00, dbPath)
+	mgr, err := NewPersistentLimitManager(100.00, dbPath)
 	if err != nil {
 		b.Fatalf("Failed to create manager: %v", err)
 	}
@@ -426,8 +425,7 @@ func BenchmarkPersistentLimitManager_Allow(b *testing.B) {
 	tmpDir := b.TempDir()
 	dbPath := filepath.Join(tmpDir, "bench_allow.db")
 
-	// Use quiet mode to suppress logging during benchmarks
-	mgr, err := NewPersistentLimitManagerQuiet(100.00, dbPath)
+	mgr, err := NewPersistentLimitManager(100.00, dbPath)
 	if err != nil {
 		b.Fatalf("Failed to create manager: %v", err)
 	}
@@ -447,7 +445,7 @@ func BenchmarkPersistentLimitManager_MultipleKeys(b *testing.B) {
 	tmpDir := b.TempDir()
 	dbPath := filepath.Join(tmpDir, "bench_multi.db")
 
-	mgr, err := NewPersistentLimitManagerQuiet(100.00, dbPath)
+	mgr, err := NewPersistentLimitManager(100.00, dbPath)
 	if err != nil {
 		b.Fatalf("Failed to create manager: %v", err)
 	}

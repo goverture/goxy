@@ -1,9 +1,7 @@
-package handlers
+package pricing
 
 import (
 	"testing"
-
-	"github.com/goverture/goxy/pricing"
 )
 
 func TestParseUsageFromResponse_ChatCompletion(t *testing.T) {
@@ -19,12 +17,12 @@ func TestParseUsageFromResponse_ChatCompletion(t *testing.T) {
 		},
 	}
 
-	usage, ok := parseUsageFromResponse(response)
+	usage, ok := ParseUsageFromResponse(response)
 	if !ok {
 		t.Fatal("Expected successful parsing")
 	}
 
-	expected := pricing.Usage{
+	expected := Usage{
 		PromptTokens:       100,
 		CompletionTokens:   50,
 		PromptCachedTokens: 10,
@@ -48,12 +46,12 @@ func TestParseUsageFromResponse_ResponseAPI(t *testing.T) {
 		},
 	}
 
-	usage, ok := parseUsageFromResponse(response)
+	usage, ok := ParseUsageFromResponse(response)
 	if !ok {
 		t.Fatal("Expected successful parsing")
 	}
 
-	expected := pricing.Usage{
+	expected := Usage{
 		PromptTokens:       18,
 		CompletionTokens:   64,
 		PromptCachedTokens: 5,
@@ -74,12 +72,12 @@ func TestParseUsageFromResponse_MissingObjectField(t *testing.T) {
 		},
 	}
 
-	usage, ok := parseUsageFromResponse(response)
+	usage, ok := ParseUsageFromResponse(response)
 	if !ok {
 		t.Fatal("Expected successful parsing")
 	}
 
-	expected := pricing.Usage{
+	expected := Usage{
 		PromptTokens:     200,
 		CompletionTokens: 0,
 	}
@@ -98,7 +96,7 @@ func TestParseUsageFromResponse_UnsupportedObjectType(t *testing.T) {
 		},
 	}
 
-	_, ok := parseUsageFromResponse(response)
+	_, ok := ParseUsageFromResponse(response)
 	if ok {
 		t.Fatal("Expected parsing to fail for unsupported object type")
 	}
@@ -111,7 +109,7 @@ func TestParseUsageFromResponse_MissingUsageField(t *testing.T) {
 		// No usage field
 	}
 
-	_, ok := parseUsageFromResponse(response)
+	_, ok := ParseUsageFromResponse(response)
 	if ok {
 		t.Fatal("Expected parsing to fail when usage field is missing")
 	}
@@ -133,7 +131,7 @@ func TestParseChatCompletionUsage_Complete(t *testing.T) {
 		t.Fatal("Expected successful parsing")
 	}
 
-	expected := pricing.Usage{
+	expected := Usage{
 		PromptTokens:       150,
 		CompletionTokens:   75,
 		PromptCachedTokens: 20,
@@ -158,7 +156,7 @@ func TestParseChatCompletionUsage_NoCachedTokens(t *testing.T) {
 		t.Fatal("Expected successful parsing")
 	}
 
-	expected := pricing.Usage{
+	expected := Usage{
 		PromptTokens:       100,
 		CompletionTokens:   50,
 		PromptCachedTokens: 0, // Should default to 0
@@ -185,7 +183,7 @@ func TestParseResponseAPIUsage_Complete(t *testing.T) {
 		t.Fatal("Expected successful parsing")
 	}
 
-	expected := pricing.Usage{
+	expected := Usage{
 		PromptTokens:       25,
 		CompletionTokens:   120,
 		PromptCachedTokens: 8,
@@ -210,7 +208,7 @@ func TestParseResponseAPIUsage_NoCachedTokens(t *testing.T) {
 		t.Fatal("Expected successful parsing")
 	}
 
-	expected := pricing.Usage{
+	expected := Usage{
 		PromptTokens:       30,
 		CompletionTokens:   90,
 		PromptCachedTokens: 0, // Should default to 0
@@ -243,13 +241,13 @@ func TestParseUsageFromResponse_InvalidTokenTypes(t *testing.T) {
 		},
 	}
 
-	usage, ok := parseUsageFromResponse(response)
+	usage, ok := ParseUsageFromResponse(response)
 	if !ok {
 		t.Fatal("Expected successful parsing")
 	}
 
 	// Should default to 0 for invalid values
-	expected := pricing.Usage{
+	expected := Usage{
 		PromptTokens:     0,
 		CompletionTokens: 50,
 	}

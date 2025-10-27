@@ -50,8 +50,8 @@ func (m Money) Add(other Money) Money {
 }
 
 // Multiply multiplies Money by a scalar (for token calculations)
-func (m Money) Multiply(factor float64) Money {
-	return Money(math.Round(float64(m) * factor))
+func (m Money) Multiply(factor int64) Money {
+	return m * Money(factor)
 }
 
 // String returns the Money as a formatted USD string

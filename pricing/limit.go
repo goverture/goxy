@@ -79,9 +79,7 @@ func (m *ManagerMoney) AddCost(key string, delta Money) {
 	if m.limit.IsNegative() {
 		return
 	} // disabled
-	if m.limit.IsZero() {
-		return
-	} // zero allowance blocked earlier
+
 	kw := m.getKWMoney(key)
 	kw.mu.Lock()
 	now := time.Now()
